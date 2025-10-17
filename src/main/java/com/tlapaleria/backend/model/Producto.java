@@ -16,7 +16,9 @@ public class Producto {
     @Column(nullable = false)
     private String descripcion;
 
+    @Column(nullable = false)
     private String codigo_barras;
+
     private Double costo;
     private Double precio;
     private Integer existencia;

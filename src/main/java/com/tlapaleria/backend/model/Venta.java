@@ -5,8 +5,8 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "pedidos")
-public class Pedido {
+@Table(name = "ventas")
+public class Venta {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -15,15 +15,17 @@ public class Pedido {
     @Column(nullable = false)
     private LocalDateTime fecha = LocalDateTime.now();
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private EstadoPedido estado = EstadoPedido.PENDIENTE;
-
     @Column(nullable = false)
     private Double total = 0.0;
 
-    @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<DetallePedido> detalles;
+    @Column(nullable = false)
+    private Double pago_con = 0.0;
+
+    @Column(nullable = false)
+    private Double cambio = 0.0;
+
+    @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<DetalleVenta> detalles;
 
     // Getters y Setters
     public Long getId() { return id; }
@@ -32,12 +34,15 @@ public class Pedido {
     public LocalDateTime getFecha() { return fecha; }
     public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
 
-    public EstadoPedido getEstado() { return estado; }
-    public void setEstado(EstadoPedido estado) { this.estado = estado; }
-
     public Double getTotal() { return total; }
     public void setTotal(Double total) { this.total = total; }
 
-    public List<DetallePedido> getDetalles() { return detalles; }
-    public void setDetalles(List<DetallePedido> detalles) { this.detalles = detalles; }
+    public Double getPago_con() { return pago_con; }
+    public void setPago_con(Double pago_con) { this.pago_con = pago_con; }
+
+    public Double getCambio() { return cambio; }
+    public void setCambio(Double cambio) { this.cambio = cambio; }
+
+    public List<DetalleVenta> getDetalles() { return detalles; }
+    public void setDetalles(List<DetalleVenta> detalles) { this.detalles = detalles; }
 }
