@@ -1,7 +1,10 @@
 package com.tlapaleria.backend.controller;
 
 import com.tlapaleria.backend.model.DetalleVenta;
+import com.tlapaleria.backend.model.Producto;
+import com.tlapaleria.backend.model.Venta;
 import com.tlapaleria.backend.repository.DetalleVentaRepository;
+import com.tlapaleria.backend.repository.VentaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +19,9 @@ public class DetalleVentaController {
     @Autowired
     private DetalleVentaRepository detalleVentaRepository;
 
+    @Autowired
+    private VentaRepository ventaRepository; // 👈 Necesario para actualizar total
+
     @GetMapping
     public List<DetalleVenta> getAllDetalleVentas() {
         return detalleVentaRepository.findAll();
@@ -23,14 +29,12 @@ public class DetalleVentaController {
 
     @PostMapping
     public DetalleVenta crearDetalleVenta(@RequestBody DetalleVenta detalleVenta) {
-        if(detalleVenta.getCantidad() == null || detalleVenta.getCantidad() <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor a 0");
-        }
+        validarDetalle(detalleVenta);
 
-        if(detalleVenta.getPrecio() == null || detalleVenta.getPrecio() < 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio no puede ser negativo");
-        }
-        return detalleVentaRepository.save(detalleVenta);
+        DetalleVenta nuevo = detalleVentaRepository.save(detalleVenta);
+        actualizarTotalVenta(nuevo.getVenta().getId()); // 👈 recalcular total
+
+        return nuevo;
     }
 
     @GetMapping("/{id}")
@@ -41,23 +45,68 @@ public class DetalleVentaController {
     @PutMapping("/{id}")
     public DetalleVenta actualizarDetalleVenta(@PathVariable Long id, @RequestBody DetalleVenta detalleVentaDetalles) {
         return detalleVentaRepository.findById(id).map(detalle -> {
-            if(detalleVentaDetalles.getCantidad() == null || detalleVentaDetalles.getCantidad() <= 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor a 0");
-            }
+            validarDetalle(detalleVentaDetalles);
 
-            if(detalleVentaDetalles.getPrecio() == null || detalleVentaDetalles.getPrecio() < 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio no puede ser negativo");
-            }
             detalle.setCantidad(detalleVentaDetalles.getCantidad());
             detalle.setPrecio(detalleVentaDetalles.getPrecio());
             detalle.setProducto(detalleVentaDetalles.getProducto());
             detalle.setVenta(detalleVentaDetalles.getVenta());
-            return detalleVentaRepository.save(detalle);
-        }).orElse(null);
+
+            DetalleVenta actualizado = detalleVentaRepository.save(detalle);
+            actualizarTotalVenta(actualizado.getVenta().getId()); // 👈 recalcular total
+
+            return actualizado;
+        }).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Detalle de venta no encontrado"));
     }
 
     @DeleteMapping("/{id}")
     public void eliminarDetalleVenta(@PathVariable Long id) {
+        DetalleVenta detalle = detalleVentaRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Detalle no encontrado"));
+
+        Long ventaId = detalle.getVenta().getId();
         detalleVentaRepository.deleteById(id);
+
+        actualizarTotalVenta(ventaId); // 👈 recalcular total
     }
+
+    // 🔹 Validaciones comunes
+    private void validarDetalle(DetalleVenta detalleVenta) {
+        if (detalleVenta.getCantidad() == null || detalleVenta.getCantidad() <= 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor a 0");
+
+        if (detalleVenta.getPrecio() == null || detalleVenta.getPrecio() < 0)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio no puede ser negativo");
+
+        Producto producto = detalleVenta.getProducto();
+        if (producto == null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El producto no puede ser nulo");
+
+        if (producto.getExistencia() < detalleVenta.getCantidad())
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Stock insuficiente para el producto: " + producto.getDescripcion());
+    }
+
+    private void actualizarTotalVenta(Long ventaId) {
+        Venta venta = ventaRepository.findById(ventaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
+
+        // Recalcular total sumando subtotales de los detalles
+        double nuevoTotal = venta.getDetalles()
+                .stream()
+                .mapToDouble(DetalleVenta::getSubtotal)
+                .sum();
+
+        venta.setTotal(nuevoTotal);
+
+        // Validación de pago y cálculo de cambio
+        if (venta.getPago_con() < venta.getTotal()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "El pago debe ser igual o mayor al total de la venta");
+        }
+        venta.setCambio(venta.getPago_con() - venta.getTotal());
+
+        ventaRepository.save(venta);
+    }
+
 }

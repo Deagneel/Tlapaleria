@@ -16,11 +16,15 @@ public class Producto {
     @Column(nullable = false)
     private String descripcion;
 
-    @Column(nullable = false)
+    @Column(nullable = false, unique = true)
     private String codigo_barras;
 
+    @Column(nullable = false)
     private Double costo;
+
+    @Column(nullable = false)
     private Double precio;
+
     private Integer existencia;
     private Integer existencia_min;
     private String unidad;
