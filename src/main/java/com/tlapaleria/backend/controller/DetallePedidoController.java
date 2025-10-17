@@ -20,7 +20,7 @@ public class DetallePedidoController {
     private DetallePedidoRepository detallePedidoRepository;
 
     @Autowired
-    private PedidoRepository pedidoRepository; // 👈 Necesario para actualizar el total
+    private PedidoRepository pedidoRepository;
 
     @GetMapping
     public List<DetallePedido> getAllDetallePedidos() {
@@ -29,10 +29,15 @@ public class DetallePedidoController {
 
     @PostMapping
     public DetallePedido crearDetallePedido(@RequestBody DetallePedido detallePedido) {
+        // Asignar precioIndividual si no se envía precio
+        if (detallePedido.getPrecio() == null) {
+            detallePedido.setPrecio(detallePedido.getProducto().getPrecioIndividual());
+        }
+
         validarDetalle(detallePedido);
 
         DetallePedido nuevo = detallePedidoRepository.save(detallePedido);
-        actualizarTotalPedido(nuevo.getPedido().getId()); // 👈 recalcular total
+        actualizarTotalPedido(nuevo.getPedido().getId());
 
         return nuevo;
     }
@@ -44,6 +49,11 @@ public class DetallePedidoController {
 
     @PutMapping("/{id}")
     public DetallePedido actualizarDetallePedido(@PathVariable Long id, @RequestBody DetallePedido detallePedidoDetalles) {
+        // Asignar precioIndividual si no se envía precio
+        if (detallePedidoDetalles.getPrecio() == null) {
+            detallePedidoDetalles.setPrecio(detallePedidoDetalles.getProducto().getPrecioIndividual());
+        }
+
         return detallePedidoRepository.findById(id).map(detalle -> {
             validarDetalle(detallePedidoDetalles);
 
@@ -53,7 +63,7 @@ public class DetallePedidoController {
             detalle.setPedido(detallePedidoDetalles.getPedido());
 
             DetallePedido actualizado = detallePedidoRepository.save(detalle);
-            actualizarTotalPedido(actualizado.getPedido().getId()); // 👈 recalcular total
+            actualizarTotalPedido(actualizado.getPedido().getId());
 
             return actualizado;
         }).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Detalle de pedido no encontrado"));
@@ -66,11 +76,9 @@ public class DetallePedidoController {
 
         Long pedidoId = detalle.getPedido().getId();
         detallePedidoRepository.deleteById(id);
-
-        actualizarTotalPedido(pedidoId); // 👈 recalcular después de eliminar
+        actualizarTotalPedido(pedidoId);
     }
 
-    // 🔹 Validaciones comunes
     private void validarDetalle(DetallePedido detallePedido) {
         if (detallePedido.getCantidad() == null || detallePedido.getCantidad() <= 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor a 0");
@@ -87,7 +95,6 @@ public class DetallePedidoController {
                     "Stock insuficiente para el producto: " + producto.getDescripcion());
     }
 
-    // 🔹 Método para recalcular el total del pedido
     private void actualizarTotalPedido(Long pedidoId) {
         Pedido pedido = pedidoRepository.findById(pedidoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));

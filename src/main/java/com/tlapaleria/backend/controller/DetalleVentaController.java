@@ -20,7 +20,7 @@ public class DetalleVentaController {
     private DetalleVentaRepository detalleVentaRepository;
 
     @Autowired
-    private VentaRepository ventaRepository; // 👈 Necesario para actualizar total
+    private VentaRepository ventaRepository;
 
     @GetMapping
     public List<DetalleVenta> getAllDetalleVentas() {
@@ -29,10 +29,15 @@ public class DetalleVentaController {
 
     @PostMapping
     public DetalleVenta crearDetalleVenta(@RequestBody DetalleVenta detalleVenta) {
+        // Asignar precioIndividual si no se envía precio
+        if (detalleVenta.getPrecio() == null) {
+            detalleVenta.setPrecio(detalleVenta.getProducto().getPrecioIndividual());
+        }
+
         validarDetalle(detalleVenta);
 
         DetalleVenta nuevo = detalleVentaRepository.save(detalleVenta);
-        actualizarTotalVenta(nuevo.getVenta().getId()); // 👈 recalcular total
+        actualizarTotalVenta(nuevo.getVenta().getId());
 
         return nuevo;
     }
@@ -44,6 +49,11 @@ public class DetalleVentaController {
 
     @PutMapping("/{id}")
     public DetalleVenta actualizarDetalleVenta(@PathVariable Long id, @RequestBody DetalleVenta detalleVentaDetalles) {
+        // Asignar precioIndividual si no se envía precio
+        if (detalleVentaDetalles.getPrecio() == null) {
+            detalleVentaDetalles.setPrecio(detalleVentaDetalles.getProducto().getPrecioIndividual());
+        }
+
         return detalleVentaRepository.findById(id).map(detalle -> {
             validarDetalle(detalleVentaDetalles);
 
@@ -53,7 +63,7 @@ public class DetalleVentaController {
             detalle.setVenta(detalleVentaDetalles.getVenta());
 
             DetalleVenta actualizado = detalleVentaRepository.save(detalle);
-            actualizarTotalVenta(actualizado.getVenta().getId()); // 👈 recalcular total
+            actualizarTotalVenta(actualizado.getVenta().getId());
 
             return actualizado;
         }).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Detalle de venta no encontrado"));
@@ -66,11 +76,9 @@ public class DetalleVentaController {
 
         Long ventaId = detalle.getVenta().getId();
         detalleVentaRepository.deleteById(id);
-
-        actualizarTotalVenta(ventaId); // 👈 recalcular total
+        actualizarTotalVenta(ventaId);
     }
 
-    // 🔹 Validaciones comunes
     private void validarDetalle(DetalleVenta detalleVenta) {
         if (detalleVenta.getCantidad() == null || detalleVenta.getCantidad() <= 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor a 0");
@@ -91,7 +99,6 @@ public class DetalleVentaController {
         Venta venta = ventaRepository.findById(ventaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
 
-        // Recalcular total sumando subtotales de los detalles
         double nuevoTotal = venta.getDetalles()
                 .stream()
                 .mapToDouble(DetalleVenta::getSubtotal)
@@ -99,14 +106,12 @@ public class DetalleVentaController {
 
         venta.setTotal(nuevoTotal);
 
-        // Validación de pago y cálculo de cambio
         if (venta.getPago_con() < venta.getTotal()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El pago debe ser igual o mayor al total de la venta");
         }
-        venta.setCambio(venta.getPago_con() - venta.getTotal());
 
+        venta.setCambio(venta.getPago_con() - venta.getTotal());
         ventaRepository.save(venta);
     }
-
 }

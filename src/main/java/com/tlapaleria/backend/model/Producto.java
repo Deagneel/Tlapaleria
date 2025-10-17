@@ -25,12 +25,18 @@ public class Producto {
     @Column(nullable = false)
     private Double precio;
 
+    @Column(nullable = false)
+    private Double precioIndividual;
+
     private Integer existencia;
     private Integer existencia_min;
     private String unidad;
     private Boolean activo;
 
     // Getters y Setters
+    public Double getPrecioIndividual() { return precioIndividual; }
+    public void setPrecioIndividual(Double precioIndividual) { this.precioIndividual = precioIndividual; }
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
