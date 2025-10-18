@@ -22,10 +22,10 @@ public class Producto {
     @Column(nullable = false)
     private Double costo;
 
-    @Column(nullable = false)
+    @Column(nullable = false)  // precio de caja
     private Double precio;
 
-    @Column(nullable = false)
+    @Column(name = "precio_individual", nullable = false) //
     private Double precioIndividual;
 
     private Integer existencia;
@@ -34,9 +34,6 @@ public class Producto {
     private Boolean activo;
 
     // Getters y Setters
-    public Double getPrecioIndividual() { return precioIndividual; }
-    public void setPrecioIndividual(Double precioIndividual) { this.precioIndividual = precioIndividual; }
-
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -52,8 +49,11 @@ public class Producto {
     public Double getCosto() { return costo; }
     public void setCosto(Double costo) { this.costo = costo; }
 
-    public Double getPrecio() { return precio; }
+    public Double getPrecio() { return precio; } // caja
     public void setPrecio(Double precio) { this.precio = precio; }
+
+    public Double getPrecioIndividual() { return precioIndividual; } // pieza
+    public void setPrecioIndividual(Double precioIndividual) { this.precioIndividual = precioIndividual; }
 
     public Integer getExistencia() { return existencia; }
     public void setExistencia(Integer existencia) { this.existencia = existencia; }
@@ -67,3 +67,4 @@ public class Producto {
     public Boolean getActivo() { return activo; }
     public void setActivo(Boolean activo) { this.activo = activo; }
 }
+
