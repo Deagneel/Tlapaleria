@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -31,7 +32,8 @@ public class VentaController {
                 inicio = LocalDateTime.parse(fechaInicio);
                 fin = LocalDateTime.parse(fechaFin);
             } catch (DateTimeParseException e) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato de fecha inválido. Use yyyy-MM-ddTHH:mm:ss");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Formato de fecha inválido. Use yyyy-MM-ddTHH:mm:ss");
             }
             return ventaRepository.findByFechaBetween(inicio, fin);
         }
@@ -52,7 +54,8 @@ public class VentaController {
                 inicio = LocalDateTime.parse(fechaInicio);
                 fin = LocalDateTime.parse(fechaFin);
             } catch (DateTimeParseException e) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato de fecha inválido. Use yyyy-MM-ddTHH:mm:ss");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Formato de fecha inválido. Use yyyy-MM-ddTHH:mm:ss");
             }
             ventas = ventaRepository.findByFechaBetween(inicio, fin);
         } else {
@@ -67,37 +70,28 @@ public class VentaController {
             resumen.put("pago_con", venta.getPago_con());
             resumen.put("cambio", venta.getCambio());
 
-            // Usamos getDetalles() directamente
-            resumen.put("detalles", venta.getDetalles().stream().map(dv -> Map.of(
-                    "producto", dv.getProducto().getDescripcion(),
-                    "cantidad", dv.getCantidad(),
-                    "precio", dv.getPrecio(),
-                    "subtotal", dv.getSubtotal()
-            )).toList());
+            resumen.put("detalles", venta.getDetalles() != null ?
+                    venta.getDetalles().stream().map(dv -> Map.of(
+                            "producto", dv.getProducto().getDescripcion(),
+                            "cantidad", dv.getCantidad(),
+                            "precio", dv.getPrecio(),
+                            "subtotal", dv.getSubtotal()
+                    )).toList() : Collections.emptyList());
 
             return resumen;
         }).toList();
     }
 
-
     @PostMapping
     public Venta crearVenta(@RequestBody Venta venta) {
-        if (venta.getDetalles() != null) {
-            double total = venta.getDetalles().stream()
-                    .mapToDouble(d -> d.getCantidad() * d.getPrecio())
-                    .sum();
-            venta.setTotal(total);
-
-            if (venta.getPago_con() != null) {
-                venta.setCambio(venta.getPago_con() - total);
-            }
-        }
+        calcularTotales(venta);
         return ventaRepository.save(venta);
     }
 
     @GetMapping("/{id}")
     public Venta getVentaById(@PathVariable Long id) {
-        return ventaRepository.findById(id).orElse(null);
+        return ventaRepository.findById(id).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
     }
 
     @PutMapping("/{id}")
@@ -105,36 +99,25 @@ public class VentaController {
         return ventaRepository.findById(id).map(venta -> {
             venta.setDetalles(detallesVenta.getDetalles());
             venta.setPago_con(detallesVenta.getPago_con());
-
-            if (venta.getDetalles() != null) {
-                double total = venta.getDetalles().stream()
-                        .mapToDouble(d -> d.getCantidad() * d.getPrecio())
-                        .sum();
-                venta.setTotal(total);
-
-                if (venta.getPago_con() != null) {
-                    venta.setCambio(venta.getPago_con() - total);
-                }
-            }
+            calcularTotales(venta);
             return ventaRepository.save(venta);
-        }).orElse(null);
+        }).orElseThrow(() ->
+                new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
     }
 
     @DeleteMapping("/{id}")
     public void eliminarVenta(@PathVariable Long id) {
+        if (!ventaRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada");
+        }
         ventaRepository.deleteById(id);
     }
+
     @GetMapping("/{id}/ticket")
     public Map<String, Object> generarTicket(@PathVariable Long id) {
-        Optional<Venta> ventaOpt = ventaRepository.findById(id);
+        Venta venta = ventaRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
 
-        if (ventaOpt.isEmpty()) {
-            throw new RuntimeException("Venta no encontrada con id: " + id);
-        }
-
-        Venta venta = ventaOpt.get();
-
-        // Construimos el mapa que representará el ticket
         Map<String, Object> ticket = new LinkedHashMap<>();
         ticket.put("id", venta.getId());
         ticket.put("fecha", venta.getFecha());
@@ -142,7 +125,6 @@ public class VentaController {
         ticket.put("pago_con", venta.getPago_con());
         ticket.put("cambio", venta.getCambio());
 
-        // Construimos la lista de detalles
         List<Map<String, Object>> detalles = new ArrayList<>();
         if (venta.getDetalles() != null) {
             for (DetalleVenta detalle : venta.getDetalles()) {
@@ -154,10 +136,28 @@ public class VentaController {
                 detalles.add(det);
             }
         }
-
         ticket.put("detalles", detalles);
-
         return ticket;
     }
 
+    // 🔹 Método privado para calcular total, cambio y validar pago
+    private void calcularTotales(Venta venta) {
+        if (venta.getDetalles() != null && !venta.getDetalles().isEmpty()) {
+            BigDecimal total = venta.getDetalles().stream()
+                    .map(d -> d.getPrecio().multiply(BigDecimal.valueOf(d.getCantidad())))
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            venta.setTotal(total);
+
+            if (venta.getPago_con() != null) {
+                if (venta.getPago_con().compareTo(total) < 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "El pago debe ser igual o mayor al total de la venta");
+                }
+                venta.setCambio(venta.getPago_con().subtract(total));
+            }
+        } else {
+            venta.setTotal(BigDecimal.ZERO);
+            venta.setCambio(BigDecimal.ZERO);
+        }
+    }
 }

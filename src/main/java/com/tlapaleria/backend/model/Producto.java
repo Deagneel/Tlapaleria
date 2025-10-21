@@ -1,6 +1,7 @@
 package com.tlapaleria.backend.model;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "productos")
@@ -19,21 +20,21 @@ public class Producto {
     @Column(nullable = false, unique = true)
     private String codigo_barras;
 
-    @Column(nullable = false)
-    private Double costo;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal costo;
 
-    @Column(nullable = false)  // precio de caja
-    private Double precio;
+    @Column(nullable = false, precision = 10, scale = 2)  // precio por caja
+    private BigDecimal precio;
 
-    @Column(name = "precio_individual", nullable = false) //
-    private Double precioIndividual;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal precioIndividual;
 
     private Integer existencia;
     private Integer existencia_min;
     private String unidad;
     private Boolean activo;
 
-    // Getters y Setters
+    // ====== Getters y Setters ======
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -46,14 +47,14 @@ public class Producto {
     public String getCodigo_barras() { return codigo_barras; }
     public void setCodigo_barras(String codigo_barras) { this.codigo_barras = codigo_barras; }
 
-    public Double getCosto() { return costo; }
-    public void setCosto(Double costo) { this.costo = costo; }
+    public BigDecimal getCosto() { return costo != null ? costo : BigDecimal.ZERO; }
+    public void setCosto(BigDecimal costo) { this.costo = costo; }
 
-    public Double getPrecio() { return precio; } // caja
-    public void setPrecio(Double precio) { this.precio = precio; }
+    public BigDecimal getPrecio() { return precio != null ? precio : BigDecimal.ZERO; }
+    public void setPrecio(BigDecimal precio) { this.precio = precio; }
 
-    public Double getPrecioIndividual() { return precioIndividual; } // pieza
-    public void setPrecioIndividual(Double precioIndividual) { this.precioIndividual = precioIndividual; }
+    public BigDecimal getPrecioIndividual() { return precioIndividual; }
+    public void setPrecioIndividual(BigDecimal precioIndividual) { this.precioIndividual = precioIndividual; }
 
     public Integer getExistencia() { return existencia; }
     public void setExistencia(Integer existencia) { this.existencia = existencia; }
@@ -67,4 +68,3 @@ public class Producto {
     public Boolean getActivo() { return activo; }
     public void setActivo(Boolean activo) { this.activo = activo; }
 }
-

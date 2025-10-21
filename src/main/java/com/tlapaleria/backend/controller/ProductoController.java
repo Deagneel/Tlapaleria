@@ -7,6 +7,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -73,13 +74,13 @@ public class ProductoController {
         if (producto.getDescripcion() == null || producto.getDescripcion().isBlank())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La descripción es obligatoria");
 
-        if (producto.getCosto() == null || producto.getCosto() < 0)
+        if (producto.getCosto() == null || producto.getCosto().compareTo(BigDecimal.ZERO) < 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El costo no puede ser negativo");
 
-        if (producto.getPrecio() == null || producto.getPrecio() < 0)
+        if (producto.getPrecio() == null || producto.getPrecio().compareTo(BigDecimal.ZERO) < 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio por caja no puede ser negativo");
 
-        if (producto.getPrecioIndividual() == null || producto.getPrecioIndividual() < 0)
+        if (producto.getPrecioIndividual() == null || producto.getPrecioIndividual().compareTo(BigDecimal.ZERO) < 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio individual no puede ser negativo");
 
         if (producto.getExistencia() == null || producto.getExistencia() < 0)

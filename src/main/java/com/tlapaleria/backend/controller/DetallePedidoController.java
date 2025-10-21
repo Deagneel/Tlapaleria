@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -29,9 +30,10 @@ public class DetallePedidoController {
 
     @PostMapping
     public DetallePedido crearDetallePedido(@RequestBody DetallePedido detallePedido) {
-        // Asignar precioIndividual si no se envía precio
+        // Si no se envía el precio, usar el precio individual del producto
         if (detallePedido.getPrecio() == null) {
-            detallePedido.setPrecio(detallePedido.getProducto().getPrecioIndividual());
+            BigDecimal precioProducto = detallePedido.getProducto().getPrecioIndividual();
+            detallePedido.setPrecio(precioProducto != null ? precioProducto : BigDecimal.ZERO);
         }
 
         validarDetalle(detallePedido);
@@ -44,14 +46,16 @@ public class DetallePedidoController {
 
     @GetMapping("/{id}")
     public DetallePedido getDetallePedidoById(@PathVariable Long id) {
-        return detallePedidoRepository.findById(id).orElse(null);
+        return detallePedidoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Detalle no encontrado"));
     }
 
     @PutMapping("/{id}")
     public DetallePedido actualizarDetallePedido(@PathVariable Long id, @RequestBody DetallePedido detallePedidoDetalles) {
-        // Asignar precioIndividual si no se envía precio
+        // Si no se envía el precio, usar el precio individual del producto
         if (detallePedidoDetalles.getPrecio() == null) {
-            detallePedidoDetalles.setPrecio(detallePedidoDetalles.getProducto().getPrecioIndividual());
+            BigDecimal precioProducto = detallePedidoDetalles.getProducto().getPrecioIndividual();
+            detallePedidoDetalles.setPrecio(precioProducto != null ? precioProducto : BigDecimal.ZERO);
         }
 
         return detallePedidoRepository.findById(id).map(detalle -> {
@@ -83,7 +87,7 @@ public class DetallePedidoController {
         if (detallePedido.getCantidad() == null || detallePedido.getCantidad() <= 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor a 0");
 
-        if (detallePedido.getPrecio() == null || detallePedido.getPrecio() < 0)
+        if (detallePedido.getPrecio() == null || detallePedido.getPrecio().compareTo(BigDecimal.ZERO) < 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio no puede ser negativo");
 
         Producto producto = detallePedido.getProducto();
@@ -99,10 +103,11 @@ public class DetallePedidoController {
         Pedido pedido = pedidoRepository.findById(pedidoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));
 
-        double nuevoTotal = pedido.getDetalles()
+        // ✅ Sumar subtotales con BigDecimal
+        BigDecimal nuevoTotal = pedido.getDetalles()
                 .stream()
-                .mapToDouble(DetallePedido::getSubtotal)
-                .sum();
+                .map(DetallePedido::getSubtotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         pedido.setTotal(nuevoTotal);
         pedidoRepository.save(pedido);

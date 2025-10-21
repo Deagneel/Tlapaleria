@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -20,7 +21,6 @@ public class PedidoController {
     @Autowired
     private PedidoRepository pedidoRepository;
 
-    // 🔹 Obtener todos los pedidos o filtrado por estado
     @GetMapping
     public List<Pedido> getPedidos(@RequestParam(required = false) String estado) {
         if (estado != null && !estado.isEmpty()) {
@@ -35,7 +35,6 @@ public class PedidoController {
         return pedidoRepository.findAll();
     }
 
-    // 🔹 Obtener resumen de todos los pedidos
     @GetMapping("/filtrar")
     public List<Pedido> filtrarPedidos(
             @RequestParam(required = false) String estado,
@@ -54,21 +53,15 @@ public class PedidoController {
         LocalDateTime inicio = null;
         LocalDateTime fin = null;
         try {
-            if (fechaInicio != null && !fechaInicio.isEmpty()) {
-                inicio = LocalDateTime.parse(fechaInicio);
-            }
-            if (fechaFin != null && !fechaFin.isEmpty()) {
-                fin = LocalDateTime.parse(fechaFin);
-            }
+            if (fechaInicio != null && !fechaInicio.isEmpty()) inicio = LocalDateTime.parse(fechaInicio);
+            if (fechaFin != null && !fechaFin.isEmpty()) fin = LocalDateTime.parse(fechaFin);
         } catch (Exception e) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato de fecha inválido");
         }
 
-        List<Pedido> pedidos = pedidoRepository.findAll(); // inicializamos con todos
+        List<Pedido> pedidos = pedidoRepository.findAll();
 
-        if (estadoEnum != null) {
-            pedidos = pedidoRepository.findByEstado(estadoEnum);
-        }
+        if (estadoEnum != null) pedidos = pedidoRepository.findByEstado(estadoEnum);
 
         if (inicio != null && fin != null) {
             LocalDateTime finalInicio = inicio;
@@ -91,41 +84,31 @@ public class PedidoController {
         return pedidos;
     }
 
-
-    // 🔹 Crear pedido con validación y total automático
     @PostMapping
     public Pedido crearPedido(@RequestBody Pedido pedido) {
         if (pedido.getDetalles() != null) {
-            for (DetallePedido detalle : pedido.getDetalles()) {
-                validarDetallePedido(detalle);
-            }
+            for (DetallePedido detalle : pedido.getDetalles()) validarDetallePedido(detalle);
         }
         Pedido nuevo = pedidoRepository.save(pedido);
         actualizarTotalPedido(nuevo.getId());
         return pedidoRepository.findById(nuevo.getId()).get();
     }
 
-    // 🔹 Obtener pedido por ID
     @GetMapping("/{id}")
     public Pedido getPedidoById(@PathVariable Long id) {
         return pedidoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));
     }
 
-    // 🔹 Actualizar pedido con validación y total automático
     @PutMapping("/{id}")
     public Pedido actualizarPedido(@PathVariable Long id, @RequestBody Pedido pedidoDetalles) {
         return pedidoRepository.findById(id).map(pedido -> {
 
-            // Actualizamos estado
             pedido.setEstado(pedidoDetalles.getEstado());
 
-            // Validamos y actualizamos detalles
             List<DetallePedido> nuevosDetalles = pedidoDetalles.getDetalles();
             if (nuevosDetalles != null) {
-                for (DetallePedido detalle : nuevosDetalles) {
-                    validarDetallePedido(detalle);
-                }
+                for (DetallePedido detalle : nuevosDetalles) validarDetallePedido(detalle);
                 pedido.setDetalles(nuevosDetalles);
             }
 
@@ -136,7 +119,6 @@ public class PedidoController {
         }).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));
     }
 
-    // 🔹 Eliminar pedido
     @DeleteMapping("/{id}")
     public void eliminarPedido(@PathVariable Long id) {
         Pedido pedido = pedidoRepository.findById(id)
@@ -144,7 +126,6 @@ public class PedidoController {
         pedidoRepository.deleteById(id);
     }
 
-    // 🔹 Resumen simplificado de un pedido (para enviar a proveedor)
     @GetMapping("/{id}/resumen")
     public Map<String, Object> generarResumenPedido(@PathVariable Long id) {
         Pedido pedido = pedidoRepository.findById(id)
@@ -169,30 +150,23 @@ public class PedidoController {
         return resumen;
     }
 
-    // Validar cada detalle del pedido
     private void validarDetallePedido(DetallePedido detalle) {
         if (detalle.getCantidad() == null || detalle.getCantidad() <= 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor a 0");
 
-        if (detalle.getPrecio() == null || detalle.getPrecio() < 0)
+        if (detalle.getPrecio() == null || detalle.getPrecio().compareTo(BigDecimal.ZERO) < 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio no puede ser negativo");
-
-        Producto producto = detalle.getProducto();
-        if (producto == null)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El producto no puede ser nulo");
-
-        if (producto.getExistencia() != null && producto.getExistencia() < detalle.getCantidad())
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Stock insuficiente para el producto: " + producto.getDescripcion());
     }
 
-    // Recalcular total del pedido
     private void actualizarTotalPedido(Long pedidoId) {
         Pedido pedido = pedidoRepository.findById(pedidoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));
 
-        double total = pedido.getDetalles() != null ?
-                pedido.getDetalles().stream().mapToDouble(DetallePedido::getSubtotal).sum() : 0.0;
+        BigDecimal total = pedido.getDetalles() != null
+                ? pedido.getDetalles().stream()
+                .map(DetallePedido::getSubtotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                : BigDecimal.ZERO;
 
         pedido.setTotal(total);
         pedidoRepository.save(pedido);

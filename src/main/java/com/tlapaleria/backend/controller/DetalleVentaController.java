@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @RestController
@@ -31,7 +32,8 @@ public class DetalleVentaController {
     public DetalleVenta crearDetalleVenta(@RequestBody DetalleVenta detalleVenta) {
         // Asignar precioIndividual si no se envía precio
         if (detalleVenta.getPrecio() == null) {
-            detalleVenta.setPrecio(detalleVenta.getProducto().getPrecioIndividual());
+            BigDecimal precioInd = detalleVenta.getProducto().getPrecioIndividual();
+            detalleVenta.setPrecio(precioInd != null ? precioInd : BigDecimal.ZERO);
         }
 
         validarDetalle(detalleVenta);
@@ -51,7 +53,8 @@ public class DetalleVentaController {
     public DetalleVenta actualizarDetalleVenta(@PathVariable Long id, @RequestBody DetalleVenta detalleVentaDetalles) {
         // Asignar precioIndividual si no se envía precio
         if (detalleVentaDetalles.getPrecio() == null) {
-            detalleVentaDetalles.setPrecio(detalleVentaDetalles.getProducto().getPrecioIndividual());
+            BigDecimal precioInd = detalleVentaDetalles.getProducto().getPrecioIndividual();
+            detalleVentaDetalles.setPrecio(precioInd != null ? precioInd : BigDecimal.ZERO);
         }
 
         return detalleVentaRepository.findById(id).map(detalle -> {
@@ -83,7 +86,7 @@ public class DetalleVentaController {
         if (detalleVenta.getCantidad() == null || detalleVenta.getCantidad() <= 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor a 0");
 
-        if (detalleVenta.getPrecio() == null || detalleVenta.getPrecio() < 0)
+        if (detalleVenta.getPrecio() == null || detalleVenta.getPrecio().compareTo(BigDecimal.ZERO) < 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio no puede ser negativo");
 
         Producto producto = detalleVenta.getProducto();
@@ -99,19 +102,21 @@ public class DetalleVentaController {
         Venta venta = ventaRepository.findById(ventaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
 
-        double nuevoTotal = venta.getDetalles()
+        // Sumar subtotal usando BigDecimal
+        BigDecimal nuevoTotal = venta.getDetalles()
                 .stream()
-                .mapToDouble(DetalleVenta::getSubtotal)
-                .sum();
+                .map(DetalleVenta::getSubtotal) // getSubtotal devuelve BigDecimal
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         venta.setTotal(nuevoTotal);
 
-        if (venta.getPago_con() < venta.getTotal()) {
+        // Comparaciones con BigDecimal
+        if (venta.getPago_con().compareTo(venta.getTotal()) < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El pago debe ser igual o mayor al total de la venta");
         }
 
-        venta.setCambio(venta.getPago_con() - venta.getTotal());
+        venta.setCambio(venta.getPago_con().subtract(venta.getTotal()));
         ventaRepository.save(venta);
     }
 }

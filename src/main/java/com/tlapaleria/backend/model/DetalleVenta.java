@@ -1,6 +1,7 @@
 package com.tlapaleria.backend.model;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 
 @Entity
 @Table(name = "detalle_venta")
@@ -19,10 +20,15 @@ public class DetalleVenta {
     private Producto producto;
 
     private Integer cantidad;
-    private Double precio;
 
-    public Double getSubtotal() {
-        return (cantidad != null && precio != null) ? cantidad * precio : 0.0;
+    @Column(precision = 19, scale = 2)
+    private BigDecimal precio;
+
+    public BigDecimal getSubtotal() {
+        if (cantidad != null && precio != null) {
+            return precio.multiply(BigDecimal.valueOf(cantidad));
+        }
+        return BigDecimal.ZERO;
     }
 
     // Getters y Setters
@@ -38,6 +44,6 @@ public class DetalleVenta {
     public Integer getCantidad() { return cantidad; }
     public void setCantidad(Integer cantidad) { this.cantidad = cantidad; }
 
-    public Double getPrecio() { return precio; }
-    public void setPrecio(Double precio) { this.precio = precio; }
+    public BigDecimal getPrecio() { return precio; }
+    public void setPrecio(BigDecimal precio) { this.precio = precio; }
 }

@@ -1,6 +1,7 @@
 package com.tlapaleria.backend.model;
 
 import jakarta.persistence.*;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -12,37 +13,67 @@ public class Venta {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
-    private LocalDateTime fecha = LocalDateTime.now();
-
-    @Column(nullable = false)
-    private Double total = 0.0;
-
-    @Column(nullable = false)
-    private Double pago_con = 0.0;
-
-    @Column(nullable = false)
-    private Double cambio = 0.0;
-
     @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DetalleVenta> detalles;
 
+    @Column(nullable = false)
+    private BigDecimal total = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private BigDecimal pago_con = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private BigDecimal cambio = BigDecimal.ZERO;
+
+    @Column(nullable = false)
+    private LocalDateTime fecha = LocalDateTime.now();
+
     // Getters y Setters
-    public Long getId() { return id; }
-    public void setId(Long id) { this.id = id; }
+    public Long getId() {
+        return id;
+    }
 
-    public LocalDateTime getFecha() { return fecha; }
-    public void setFecha(LocalDateTime fecha) { this.fecha = fecha; }
+    public void setId(Long id) {
+        this.id = id;
+    }
 
-    public Double getTotal() { return total; }
-    public void setTotal(Double total) { this.total = total; }
+    public List<DetalleVenta> getDetalles() {
+        return detalles;
+    }
 
-    public Double getPago_con() { return pago_con; }
-    public void setPago_con(Double pago_con) { this.pago_con = pago_con; }
+    public void setDetalles(List<DetalleVenta> detalles) {
+        this.detalles = detalles;
+    }
 
-    public Double getCambio() { return cambio; }
-    public void setCambio(Double cambio) { this.cambio = cambio; }
+    public BigDecimal getTotal() {
+        return total;
+    }
 
-    public List<DetalleVenta> getDetalles() { return detalles; }
-    public void setDetalles(List<DetalleVenta> detalles) { this.detalles = detalles; }
+    public void setTotal(BigDecimal total) {
+        this.total = total;
+    }
+
+    public BigDecimal getPago_con() {
+        return pago_con;
+    }
+
+    public void setPago_con(BigDecimal pago_con) {
+        this.pago_con = pago_con;
+    }
+
+    public BigDecimal getCambio() {
+        return cambio;
+    }
+
+    public void setCambio(BigDecimal cambio) {
+        this.cambio = cambio;
+    }
+
+    public LocalDateTime getFecha() {
+        return fecha;
+    }
+
+    public void setFecha(LocalDateTime fecha) {
+        this.fecha = fecha;
+    }
 }
