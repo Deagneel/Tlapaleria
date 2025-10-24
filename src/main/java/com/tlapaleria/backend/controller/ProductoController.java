@@ -17,27 +17,23 @@ public class ProductoController {
     @Autowired
     private ProductoRepository productoRepository;
 
-    // ✅ Obtener todos los productos
     @GetMapping
     public List<Producto> getAllProductos() {
         return productoRepository.findAll();
     }
 
-    // ✅ Crear nuevo producto
     @PostMapping
     public Producto crearProducto(@RequestBody Producto producto) {
         validarProducto(producto);
         return productoRepository.save(producto);
     }
 
-    // ✅ Obtener producto por ID
     @GetMapping("/{id}")
     public Producto getProductoById(@PathVariable Long id) {
         return productoRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
     }
 
-    // ✅ Actualizar producto existente
     @PutMapping("/{id}")
     public Producto actualizarProducto(@PathVariable Long id, @RequestBody Producto detallesProducto) {
         return productoRepository.findById(id).map(producto -> {
@@ -57,7 +53,6 @@ public class ProductoController {
         }).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
     }
 
-    // ✅ Eliminar producto por ID
     @DeleteMapping("/{id}")
     public void eliminarProducto(@PathVariable Long id) {
         if (!productoRepository.existsById(id)) {
@@ -66,7 +61,6 @@ public class ProductoController {
         productoRepository.deleteById(id);
     }
 
-    // 🔹 Validaciones de integridad
     private void validarProducto(Producto producto) {
         if (producto.getClave() == null || producto.getClave().isBlank())
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La clave del producto es obligatoria");

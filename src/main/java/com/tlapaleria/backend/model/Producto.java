@@ -34,7 +34,6 @@ public class Producto {
     private String unidad;
     private Boolean activo;
 
-    // ====== Getters y Setters ======
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

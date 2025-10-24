@@ -140,7 +140,7 @@ public class VentaController {
         return ticket;
     }
 
-    // 🔹 Método privado para calcular total, cambio y validar pago
+
     private void calcularTotales(Venta venta) {
         if (venta.getDetalles() != null && !venta.getDetalles().isEmpty()) {
             BigDecimal total = venta.getDetalles().stream()

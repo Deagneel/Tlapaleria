@@ -23,12 +23,11 @@ public class Pedido {
 
     @Enumerated(EnumType.STRING)
     @Column(name = "estado", nullable = false)
-    private EstadoPedido estado = EstadoPedido.PENDIENTE; // valor por defecto
+    private EstadoPedido estado = EstadoPedido.PENDIENTE;
 
     @OneToMany(mappedBy = "pedido", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DetallePedido> detalles;
 
-    // ====== Getters y Setters ======
 
     public Long getId() {
         return id;
@@ -78,7 +77,7 @@ public class Pedido {
         this.detalles = detalles;
     }
 
-    // ====== Inicializar fecha al crear el pedido ======
+
     @PrePersist
     public void prePersist() {
         if (this.fecha == null) {

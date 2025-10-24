@@ -102,7 +102,7 @@ public class DetalleVentaController {
         Venta venta = ventaRepository.findById(ventaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
 
-        // Sumar subtotal usando BigDecimal
+
         BigDecimal nuevoTotal = venta.getDetalles()
                 .stream()
                 .map(DetalleVenta::getSubtotal) // getSubtotal devuelve BigDecimal
@@ -110,7 +110,7 @@ public class DetalleVentaController {
 
         venta.setTotal(nuevoTotal);
 
-        // Comparaciones con BigDecimal
+
         if (venta.getPago_con().compareTo(venta.getTotal()) < 0) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "El pago debe ser igual o mayor al total de la venta");

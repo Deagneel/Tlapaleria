@@ -24,7 +24,6 @@ public class DetallePedido {
     @Column(precision = 10, scale = 2)
     private BigDecimal precio;
 
-    // ✅ Subtotal calculado correctamente con BigDecimal
     public BigDecimal getSubtotal() {
         if (cantidad != null && precio != null) {
             return precio.multiply(BigDecimal.valueOf(cantidad));
@@ -32,7 +31,6 @@ public class DetallePedido {
         return BigDecimal.ZERO;
     }
 
-    // Getters y Setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

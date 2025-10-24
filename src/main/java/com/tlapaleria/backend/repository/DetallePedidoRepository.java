@@ -8,7 +8,5 @@ import java.util.Optional;
 
 @Repository
 public interface DetallePedidoRepository extends JpaRepository<DetallePedido, Long> {
-
-    // Buscar un detalle por el id del pedido y del producto
     Optional<DetallePedido> findByPedidoIdAndProductoId(Long pedidoId, Long productoId);
 }

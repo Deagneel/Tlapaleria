@@ -103,7 +103,7 @@ public class DetallePedidoController {
         Pedido pedido = pedidoRepository.findById(pedidoId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));
 
-        // ✅ Sumar subtotales con BigDecimal
+
         BigDecimal nuevoTotal = pedido.getDetalles()
                 .stream()
                 .map(DetallePedido::getSubtotal)
