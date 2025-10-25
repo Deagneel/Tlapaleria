@@ -17,13 +17,13 @@ public class Producto {
     @Column(nullable = false)
     private String descripcion;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true) // quitamos nullable = false para que coincida con la DB
     private String codigo_barras;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal costo;
 
-    @Column(nullable = false, precision = 10, scale = 2)  // precio por caja
+    @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal precio;
 
     @Column(precision = 19, scale = 2)
@@ -52,18 +52,18 @@ public class Producto {
     public BigDecimal getPrecio() { return precio != null ? precio : BigDecimal.ZERO; }
     public void setPrecio(BigDecimal precio) { this.precio = precio; }
 
-    public BigDecimal getPrecioIndividual() { return precioIndividual; }
+    public BigDecimal getPrecioIndividual() { return precioIndividual != null ? precioIndividual : BigDecimal.ZERO; }
     public void setPrecioIndividual(BigDecimal precioIndividual) { this.precioIndividual = precioIndividual; }
 
-    public Integer getExistencia() { return existencia; }
+    public Integer getExistencia() { return existencia != null ? existencia : 0; }
     public void setExistencia(Integer existencia) { this.existencia = existencia; }
 
-    public Integer getExistencia_min() { return existencia_min; }
+    public Integer getExistencia_min() { return existencia_min != null ? existencia_min : 0; }
     public void setExistencia_min(Integer existencia_min) { this.existencia_min = existencia_min; }
 
     public String getUnidad() { return unidad; }
     public void setUnidad(String unidad) { this.unidad = unidad; }
 
-    public Boolean getActivo() { return activo; }
+    public Boolean getActivo() { return activo != null ? activo : true; }
     public void setActivo(Boolean activo) { this.activo = activo; }
 }
