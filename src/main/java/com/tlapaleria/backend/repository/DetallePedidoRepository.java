@@ -4,9 +4,7 @@ import com.tlapaleria.backend.model.DetallePedido;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
-import java.util.Optional;
-
 @Repository
 public interface DetallePedidoRepository extends JpaRepository<DetallePedido, Long> {
-    Optional<DetallePedido> findByPedidoIdAndProductoId(Long pedidoId, Long productoId);
+    boolean existsByProductoId(Long productoId);
 }

@@ -93,10 +93,6 @@ public class DetallePedidoController {
         Producto producto = detallePedido.getProducto();
         if (producto == null)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El producto no puede ser nulo");
-
-        if (producto.getExistencia() < detallePedido.getCantidad())
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                    "Stock insuficiente para el producto: " + producto.getDescripcion());
     }
 
     private void actualizarTotalPedido(Long pedidoId) {

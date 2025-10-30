@@ -2,6 +2,8 @@ package com.tlapaleria.backend.controller;
 
 import com.tlapaleria.backend.model.Producto;
 import com.tlapaleria.backend.repository.ProductoRepository;
+import com.tlapaleria.backend.repository.DetallePedidoRepository;
+import com.tlapaleria.backend.repository.DetalleVentaRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,12 @@ public class ProductoController {
 
     @Autowired
     private ProductoRepository productoRepository;
+
+    @Autowired
+    private DetallePedidoRepository detallePedidoRepository;
+
+    @Autowired
+    private DetalleVentaRepository detalleVentaRepository;
 
     @GetMapping
     public List<Producto> getAllProductos() {
@@ -55,10 +63,18 @@ public class ProductoController {
 
     @DeleteMapping("/{id}")
     public void eliminarProducto(@PathVariable Long id) {
-        if (!productoRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado");
+        Producto producto = productoRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Producto no encontrado"));
+
+        boolean tienePedidos = detallePedidoRepository.existsByProductoId(id);
+        boolean tieneVentas = detalleVentaRepository.existsByProductoId(id);
+
+        if (tienePedidos || tieneVentas) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "No se puede eliminar el producto porque está asociado a pedidos o ventas.");
         }
-        productoRepository.deleteById(id);
+
+        productoRepository.delete(producto);
     }
 
     private void validarProducto(Producto producto) {
