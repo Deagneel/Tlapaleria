@@ -2,6 +2,7 @@ package com.tlapaleria.backend.model;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 
 @Entity
 @Table(name = "detalle_pedido")
@@ -11,11 +12,12 @@ public class DetallePedido {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pedido_id", nullable = false)
+    @JsonBackReference
     private Pedido pedido;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "producto_id", nullable = false)
     private Producto producto;
 
@@ -31,6 +33,7 @@ public class DetallePedido {
         return BigDecimal.ZERO;
     }
 
+    // Getters y setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

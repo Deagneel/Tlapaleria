@@ -1,174 +1,166 @@
 package com.tlapaleria.backend.controller;
 
-import com.tlapaleria.backend.model.DetallePedido;
-import com.tlapaleria.backend.model.EstadoPedido;
-import com.tlapaleria.backend.model.Pedido;
-import com.tlapaleria.backend.model.Producto;
+import com.tlapaleria.backend.model.*;
+import com.tlapaleria.backend.repository.DetallePedidoRepository;
 import com.tlapaleria.backend.repository.PedidoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/pedidos")
 public class PedidoController {
 
-    @Autowired
-    private PedidoRepository pedidoRepository;
+    private final PedidoRepository pedidoRepository;
+    private final DetallePedidoRepository detallePedidoRepository;
 
-    @GetMapping
-    public List<Pedido> getPedidos(@RequestParam(required = false) String estado) {
-        if (estado != null && !estado.isEmpty()) {
-            EstadoPedido estadoEnum;
-            try {
-                estadoEnum = EstadoPedido.valueOf(estado.toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de pedido inválido");
-            }
-            return pedidoRepository.findByEstado(estadoEnum);
-        }
-        return pedidoRepository.findAll();
+    public PedidoController(PedidoRepository pedidoRepository,
+                            DetallePedidoRepository detallePedidoRepository) {
+        this.pedidoRepository = pedidoRepository;
+        this.detallePedidoRepository = detallePedidoRepository;
     }
 
-    @GetMapping("/filtrar")
-    public List<Pedido> filtrarPedidos(
-            @RequestParam(required = false) String estado,
-            @RequestParam(required = false) String fechaInicio,
-            @RequestParam(required = false) String fechaFin) {
+    // ---------------- GET ----------------
+    @GetMapping
+    public List<PedidoResumenDTO> obtenerPedidos() {
+        List<Pedido> pedidos = pedidoRepository.findAll();
+        return pedidos.stream()
+                .map(p -> new PedidoResumenDTO(
+                        p.getId(),
+                        p.getCliente(),
+                        p.getFecha(),
+                        p.getEstado().name(),
+                        p.getTotal()
+                )).collect(Collectors.toList());
+    }
 
-        EstadoPedido estadoEnum = null;
-        if (estado != null && !estado.isEmpty()) {
-            try {
-                estadoEnum = EstadoPedido.valueOf(estado.toUpperCase());
-            } catch (IllegalArgumentException e) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Estado de pedido inválido");
-            }
-        }
-
-        LocalDateTime inicio = null;
-        LocalDateTime fin = null;
-        try {
-            if (fechaInicio != null && !fechaInicio.isEmpty()) inicio = LocalDateTime.parse(fechaInicio);
-            if (fechaFin != null && !fechaFin.isEmpty()) fin = LocalDateTime.parse(fechaFin);
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato de fecha inválido");
-        }
-
+    @GetMapping("/completo")
+    public List<PedidoCompletoDTO> obtenerPedidosCompletos() {
         List<Pedido> pedidos = pedidoRepository.findAll();
 
-        if (estadoEnum != null) pedidos = pedidoRepository.findByEstado(estadoEnum);
+        return pedidos.stream().map(p -> {
+            PedidoCompletoDTO dto = new PedidoCompletoDTO();
+            dto.setId(p.getId());
+            dto.setCliente(p.getCliente());
+            dto.setEstado(p.getEstado().name());
+            dto.setTotal(p.getTotal());
 
-        if (inicio != null && fin != null) {
-            LocalDateTime finalInicio = inicio;
-            LocalDateTime finalFin = fin;
-            pedidos = pedidos.stream()
-                    .filter(p -> !p.getFecha().isBefore(finalInicio) && !p.getFecha().isAfter(finalFin))
-                    .toList();
-        } else if (inicio != null) {
-            LocalDateTime finalInicio = inicio;
-            pedidos = pedidos.stream()
-                    .filter(p -> !p.getFecha().isBefore(finalInicio))
-                    .toList();
-        } else if (fin != null) {
-            LocalDateTime finalFin = fin;
-            pedidos = pedidos.stream()
-                    .filter(p -> !p.getFecha().isAfter(finalFin))
-                    .toList();
-        }
+            List<PedidoCompletoDTO.DetallePedidoDTO> detalles = p.getDetalles().stream()
+                    .map(d -> {
+                        PedidoCompletoDTO.DetallePedidoDTO detalleDTO = new PedidoCompletoDTO.DetallePedidoDTO();
+                        detalleDTO.setId(d.getId());
+                        detalleDTO.setProducto_id(d.getProducto().getId());
+                        detalleDTO.setCantidad(d.getCantidad());
+                        detalleDTO.setPrecio(d.getPrecio());
+                        return detalleDTO;
+                    }).collect(Collectors.toList());
 
-        return pedidos;
+            dto.setDetalles(detalles);
+            return dto;
+        }).collect(Collectors.toList());
     }
 
+    // ---------------- POST ----------------
     @PostMapping
-    public Pedido crearPedido(@RequestBody Pedido pedido) {
-        if (pedido.getDetalles() != null) {
-            for (DetallePedido detalle : pedido.getDetalles()) validarDetallePedido(detalle);
+    public ResponseEntity<PedidoCompletoDTO> crearPedido(@RequestBody PedidoCompletoDTO dto) {
+        Pedido pedido = new Pedido();
+        pedido.setCliente(dto.getCliente());
+        pedido.setEstado(EstadoPedido.valueOf(dto.getEstado()));
+        pedido.setTotal(dto.getTotal());
+        pedido.setFecha(java.time.LocalDateTime.now());
+
+        List<DetallePedido> detalles = dto.getDetalles().stream().map(d -> {
+            DetallePedido detalle = new DetallePedido();
+            detalle.setPedido(pedido);
+            detalle.setCantidad(d.getCantidad());
+            detalle.setPrecio(d.getPrecio());
+
+            Producto producto = new Producto();
+            producto.setId(d.getProducto_id()); // Solo asignamos el ID, debe existir en DB
+            detalle.setProducto(producto);
+
+            return detalle;
+        }).collect(Collectors.toList());
+
+        pedido.setDetalles(detalles);
+
+        Pedido guardado = pedidoRepository.save(pedido);
+
+        dto.setId(guardado.getId());
+        for (int i = 0; i < detalles.size(); i++) {
+            dto.getDetalles().get(i).setId(detalles.get(i).getId());
         }
-        Pedido nuevo = pedidoRepository.save(pedido);
-        actualizarTotalPedido(nuevo.getId());
-        return pedidoRepository.findById(nuevo.getId()).get();
+
+        return ResponseEntity.ok(dto);
     }
 
-    @GetMapping("/{id}")
-    public Pedido getPedidoById(@PathVariable Long id) {
-        return pedidoRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));
-    }
-
+    // ---------------- PUT ----------------
     @PutMapping("/{id}")
-    public Pedido actualizarPedido(@PathVariable Long id, @RequestBody Pedido pedidoDetalles) {
-        return pedidoRepository.findById(id).map(pedido -> {
-
-            pedido.setEstado(pedidoDetalles.getEstado());
-
-            List<DetallePedido> nuevosDetalles = pedidoDetalles.getDetalles();
-            if (nuevosDetalles != null) {
-                for (DetallePedido detalle : nuevosDetalles) validarDetallePedido(detalle);
-                pedido.setDetalles(nuevosDetalles);
-            }
-
-            Pedido actualizado = pedidoRepository.save(pedido);
-            actualizarTotalPedido(actualizado.getId());
-
-            return pedidoRepository.findById(actualizado.getId()).get();
-        }).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));
-    }
-
-    @DeleteMapping("/{id}")
-    public void eliminarPedido(@PathVariable Long id) {
-        Pedido pedido = pedidoRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));
-        pedidoRepository.deleteById(id);
-    }
-
-    @GetMapping("/{id}/resumen")
-    public Map<String, Object> generarResumenPedido(@PathVariable Long id) {
-        Pedido pedido = pedidoRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));
-
-        Map<String, Object> resumen = new LinkedHashMap<>();
-        resumen.put("id", pedido.getId());
-        resumen.put("fecha", pedido.getFecha());
-        resumen.put("total", pedido.getTotal());
-
-        List<Map<String, Object>> productos = new ArrayList<>();
-        if (pedido.getDetalles() != null) {
-            for (DetallePedido detalle : pedido.getDetalles()) {
-                Map<String, Object> prod = new LinkedHashMap<>();
-                prod.put("id_producto", detalle.getProducto().getId());
-                prod.put("cantidad", detalle.getCantidad());
-                productos.add(prod);
-            }
+    public ResponseEntity<PedidoCompletoDTO> actualizarPedido(@PathVariable Long id,
+                                                              @RequestBody PedidoCompletoDTO dto) {
+        Optional<Pedido> optionalPedido = pedidoRepository.findById(id);
+        if (optionalPedido.isEmpty()) {
+            return ResponseEntity.notFound().build();
         }
-        resumen.put("productos", productos);
 
-        return resumen;
+        Pedido pedido = optionalPedido.get();
+        pedido.setCliente(dto.getCliente());
+        pedido.setEstado(EstadoPedido.valueOf(dto.getEstado()));
+        pedido.setTotal(dto.getTotal());
+
+        // Eliminar detalles que no están en el DTO
+        List<Long> idsDTO = dto.getDetalles().stream()
+                .map(PedidoCompletoDTO.DetallePedidoDTO::getId)
+                .collect(Collectors.toList());
+        pedido.getDetalles().removeIf(d -> d.getId() != null && !idsDTO.contains(d.getId()));
+
+        // Actualizar/Agregar detalles
+        for (PedidoCompletoDTO.DetallePedidoDTO d : dto.getDetalles()) {
+            DetallePedido detalle;
+            if (d.getId() != null) {
+                // actualizar existente
+                detalle = pedido.getDetalles().stream()
+                        .filter(pd -> pd.getId().equals(d.getId()))
+                        .findFirst()
+                        .orElseGet(() -> {
+                            DetallePedido nuevo = new DetallePedido();
+                            nuevo.setPedido(pedido);
+                            pedido.getDetalles().add(nuevo);
+                            return nuevo;
+                        });
+            } else {
+                // nuevo detalle
+                detalle = new DetallePedido();
+                detalle.setPedido(pedido);
+                pedido.getDetalles().add(detalle);
+            }
+
+            detalle.setCantidad(d.getCantidad());
+            detalle.setPrecio(d.getPrecio());
+
+            Producto producto = new Producto();
+            producto.setId(d.getProducto_id());
+            detalle.setProducto(producto);
+        }
+
+        Pedido guardado = pedidoRepository.save(pedido);
+        dto.setId(guardado.getId());
+        return ResponseEntity.ok(dto);
     }
 
-    private void validarDetallePedido(DetallePedido detalle) {
-        if (detalle.getCantidad() == null || detalle.getCantidad() <= 0)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La cantidad debe ser mayor a 0");
+    // ---------------- DELETE ----------------
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> eliminarPedido(@PathVariable Long id) {
+        Optional<Pedido> optionalPedido = pedidoRepository.findById(id);
+        if (optionalPedido.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
 
-        if (detalle.getPrecio() == null || detalle.getPrecio().compareTo(BigDecimal.ZERO) < 0)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio no puede ser negativo");
-    }
-
-    private void actualizarTotalPedido(Long pedidoId) {
-        Pedido pedido = pedidoRepository.findById(pedidoId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Pedido no encontrado"));
-
-        BigDecimal total = pedido.getDetalles() != null
-                ? pedido.getDetalles().stream()
-                .map(DetallePedido::getSubtotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add)
-                : BigDecimal.ZERO;
-
-        pedido.setTotal(total);
-        pedidoRepository.save(pedido);
+        pedidoRepository.delete(optionalPedido.get());
+        return ResponseEntity.noContent().build();
     }
 }
