@@ -26,6 +26,9 @@ public class DetallePedido {
     @Column(precision = 10, scale = 2)
     private BigDecimal precio;
 
+    @Column(name = "recibido", nullable = false)
+    private boolean recibido = false;
+
     public BigDecimal getSubtotal() {
         if (cantidad != null && precio != null) {
             return precio.multiply(BigDecimal.valueOf(cantidad));
@@ -48,4 +51,7 @@ public class DetallePedido {
 
     public BigDecimal getPrecio() { return precio; }
     public void setPrecio(BigDecimal precio) { this.precio = precio; }
+
+    public boolean isRecibido() { return recibido; }
+    public void setRecibido(boolean recibido) { this.recibido = recibido; }
 }

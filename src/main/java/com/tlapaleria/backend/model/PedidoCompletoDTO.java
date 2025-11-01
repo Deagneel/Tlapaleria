@@ -12,12 +12,16 @@ public class PedidoCompletoDTO {
     private List<DetallePedidoDTO> detalles;
 
     public static class DetallePedidoDTO {
-        private Long id; // opcional, null si es nuevo
+        private Long id;
         private Long producto_id;
         private Integer cantidad;
         private BigDecimal precio;
+        private Boolean recibido;
 
-        // Getters y setters
+        // Nuevo campo
+        private ProductoDTO producto;
+
+        // Getters y setters existentes
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
 
@@ -29,21 +33,24 @@ public class PedidoCompletoDTO {
 
         public BigDecimal getPrecio() { return precio; }
         public void setPrecio(BigDecimal precio) { this.precio = precio; }
+
+        public Boolean getRecibido() { return recibido; }
+        public void setRecibido(Boolean recibido) { this.recibido = recibido; }
+
+        // Getter y setter para el producto completo
+        public ProductoDTO getProducto() { return producto; }
+        public void setProducto(ProductoDTO producto) { this.producto = producto; }
     }
 
-    // Getters y setters del PedidoCompletoDTO
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
-
     public String getCliente() { return cliente; }
     public void setCliente(String cliente) { this.cliente = cliente; }
-
     public String getEstado() { return estado; }
     public void setEstado(String estado) { this.estado = estado; }
-
     public BigDecimal getTotal() { return total; }
     public void setTotal(BigDecimal total) { this.total = total; }
-
     public List<DetallePedidoDTO> getDetalles() { return detalles; }
     public void setDetalles(List<DetallePedidoDTO> detalles) { this.detalles = detalles; }
 }
