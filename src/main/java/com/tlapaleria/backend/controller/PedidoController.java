@@ -115,13 +115,15 @@ public class PedidoController {
                 pedido.setEstado(EstadoPedido.valueOf(dto.getEstado()));
             }
 
-            // eliminar detalles viejos
-            if (pedido.getDetalles() != null && !pedido.getDetalles().isEmpty()) {
-                detallePedidoRepository.deleteAll(pedido.getDetalles());
-                pedido.getDetalles().clear();
+            // Limpiamos y regeneramos los detalles pero sobre la MISMA colección
+            List<DetallePedido> actuales = pedido.getDetalles();
+            if (actuales == null) {
+                actuales = new ArrayList<>();
+                pedido.setDetalles(actuales);
+            } else {
+                actuales.clear();
             }
 
-            List<DetallePedido> nuevos = new ArrayList<>();
             if (dto.getDetalles() != null) {
                 for (PedidoCompletoDTO.DetallePedidoDTO detDto : dto.getDetalles()) {
                     if (detDto.getProducto_id() == null) continue;
@@ -134,19 +136,20 @@ public class PedidoController {
                     det.setCantidad(detDto.getCantidad());
                     det.setPrecio(detDto.getPrecio());
                     if (detDto.getRecibido() != null) det.setRecibido(detDto.getRecibido());
-                    nuevos.add(det);
+                    actuales.add(det);
                 }
             }
 
-            pedido.setDetalles(nuevos);
             Pedido guardado = pedidoRepository.save(pedido);
             PedidoCompletoDTO resp = mapPedidoACompletoDTO(guardado);
             return ResponseEntity.ok(resp);
+
         } catch (Exception ex) {
             ex.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
 
     // ---------------- PATCH: cambiar estado ----------------
     @PatchMapping("/{id}/estado")
