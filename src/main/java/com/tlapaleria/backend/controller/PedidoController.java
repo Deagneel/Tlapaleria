@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -68,7 +69,6 @@ public class PedidoController {
         try {
             Pedido pedido = new Pedido();
             pedido.setCliente(dto.getCliente());
-            pedido.setTotal(dto.getTotal());
             pedido.setFecha(LocalDateTime.now());
             pedido.setEstado(dto.getEstado() != null ? EstadoPedido.valueOf(dto.getEstado()) : EstadoPedido.PENDIENTE);
 
@@ -90,6 +90,11 @@ public class PedidoController {
             }
 
             pedido.setDetalles(detalles);
+            BigDecimal total = detalles.stream()
+                    .map(DetallePedido::getSubtotal)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            pedido.setTotal(total);
+
             Pedido guardado = pedidoRepository.save(pedido);
             PedidoCompletoDTO resp = mapPedidoACompletoDTO(guardado);
             return ResponseEntity.status(HttpStatus.CREATED).body(resp);
@@ -98,6 +103,7 @@ public class PedidoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
 
     // ---------------- PUT: actualizar pedido ----------------
     @PutMapping("/{id}")
@@ -110,12 +116,11 @@ public class PedidoController {
         try {
             Pedido pedido = pedidoOpt.get();
             pedido.setCliente(dto.getCliente());
-            pedido.setTotal(dto.getTotal());
             if (dto.getEstado() != null) {
                 pedido.setEstado(EstadoPedido.valueOf(dto.getEstado()));
             }
 
-            // Limpiamos y regeneramos los detalles pero sobre la MISMA colección
+            // Limpiamos y regeneramos los detalles sobre la MISMA colección
             List<DetallePedido> actuales = pedido.getDetalles();
             if (actuales == null) {
                 actuales = new ArrayList<>();
@@ -140,6 +145,12 @@ public class PedidoController {
                 }
             }
 
+            // ✅ Calcular total automáticamente
+            BigDecimal total = actuales.stream()
+                    .map(DetallePedido::getSubtotal)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            pedido.setTotal(total);
+
             Pedido guardado = pedidoRepository.save(pedido);
             PedidoCompletoDTO resp = mapPedidoACompletoDTO(guardado);
             return ResponseEntity.ok(resp);
@@ -149,6 +160,7 @@ public class PedidoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
 
 
     // ---------------- PATCH: cambiar estado ----------------
@@ -163,7 +175,26 @@ public class PedidoController {
             Pedido pedido = pedidoOpt.get();
             EstadoPedido destino = EstadoPedido.valueOf(nuevoEstado.toUpperCase());
             pedido.setEstado(destino);
-            Pedido actualizado = pedidoRepository.save(pedido);
+
+            if (destino == EstadoPedido.SURTIDO) {
+                for (DetallePedido detalle : pedido.getDetalles()) {
+                    if (detalle.isRecibido()) { // Solo los marcados como recibidos
+                        Producto producto = detalle.getProducto();
+                        if (producto != null) {
+                            Integer existenciaActual = producto.getExistencia();
+                            if (existenciaActual == null) existenciaActual = 0;
+
+                            Integer cantidadRecibida = detalle.getCantidad() != null ? detalle.getCantidad() : 0;
+
+                            Integer nuevaExistencia = existenciaActual + cantidadRecibida;
+                            producto.setExistencia(nuevaExistencia);
+
+                            // ⚠️ No modificamos existencia_min ni otros campos
+                            productoRepository.save(producto);
+                        }
+                    }
+                }
+            }
 
             if (destino == EstadoPedido.ENTREGADO) {
                 List<Producto> inactivos = productoRepository.findAll().stream()
@@ -174,13 +205,16 @@ public class PedidoController {
                 }
             }
 
+            Pedido actualizado = pedidoRepository.save(pedido);
             PedidoCompletoDTO dto = mapPedidoACompletoDTO(actualizado);
             return ResponseEntity.ok(dto);
+
         } catch (Exception ex) {
             ex.printStackTrace();
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
 
     // ---------------- DELETE ----------------
     @DeleteMapping("/{id}")
