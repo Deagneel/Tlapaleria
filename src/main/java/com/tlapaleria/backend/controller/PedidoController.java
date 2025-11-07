@@ -120,7 +120,6 @@ public class PedidoController {
                 pedido.setEstado(EstadoPedido.valueOf(dto.getEstado()));
             }
 
-            // Limpiamos y regeneramos los detalles sobre la MISMA colección
             List<DetallePedido> actuales = pedido.getDetalles();
             if (actuales == null) {
                 actuales = new ArrayList<>();
@@ -145,7 +144,6 @@ public class PedidoController {
                 }
             }
 
-            // ✅ Calcular total automáticamente
             BigDecimal total = actuales.stream()
                     .map(DetallePedido::getSubtotal)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -178,19 +176,18 @@ public class PedidoController {
 
             if (destino == EstadoPedido.SURTIDO) {
                 for (DetallePedido detalle : pedido.getDetalles()) {
-                    if (detalle.isRecibido()) { // Solo los marcados como recibidos
-                        Producto producto = detalle.getProducto();
-                        if (producto != null) {
-                            Integer existenciaActual = producto.getExistencia();
-                            if (existenciaActual == null) existenciaActual = 0;
+                    if (Boolean.TRUE.equals(detalle.isRecibido())) {
+                        Long productoId = detalle.getProducto().getId();
 
+                        Producto productoDb = productoRepository.findById(productoId).orElse(null);
+                        if (productoDb != null) {
+                            Integer existenciaActual = productoDb.getExistencia() != null ? productoDb.getExistencia() : 0;
                             Integer cantidadRecibida = detalle.getCantidad() != null ? detalle.getCantidad() : 0;
 
                             Integer nuevaExistencia = existenciaActual + cantidadRecibida;
-                            producto.setExistencia(nuevaExistencia);
+                            productoDb.setExistencia(nuevaExistencia);
 
-                            // ⚠️ No modificamos existencia_min ni otros campos
-                            productoRepository.save(producto);
+                            productoRepository.save(productoDb);
                         }
                     }
                 }
@@ -214,6 +211,8 @@ public class PedidoController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+
 
 
     // ---------------- DELETE ----------------

@@ -23,30 +23,26 @@ public class LimpiezaProgramadaService {
 
     /**
      * Limpia pedidos entregados hace más de 3 meses y productos temporales sin pedido.
-     * Se ejecuta automáticamente los martes a las 2:23 AM.
+     * Se ejecuta automáticamente los domingos a las 12 AM.
      */
-    @Scheduled(cron = "0 0 12 * * SUN") // Domingo 12 pm
+    @Scheduled(cron = "0 0 12 * * SUN")
     @Transactional
     public void limpiarPedidosYProductosAntiguos() {
         System.out.println("🧹 Ejecutando limpieza programada...");
 
-        // Calcular la fecha límite (3 meses atrás, incluyendo hora)
         LocalDateTime haceTresMeses = LocalDateTime.now().minusMonths(3);
 
-        // Buscar pedidos entregados antes de esa fecha
         List<Pedido> pedidosAntiguos = pedidoRepository.findByEstadoAndFechaBefore(EstadoPedido.ENTREGADO, haceTresMeses);
-        System.out.println("🧾 Pedidos antiguos encontrados: " + pedidosAntiguos.size());
+        System.out.println(" Pedidos antiguos encontrados: " + pedidosAntiguos.size());
 
-        // Eliminar los pedidos antiguos
         for (Pedido pedido : pedidosAntiguos) {
             pedidoRepository.delete(pedido);
-            System.out.println("   🗑 Pedido eliminado: " + pedido.getId());
+            System.out.println("    Pedido eliminado: " + pedido.getId());
         }
 
-        // Eliminar productos temporales sin pedidos asociados
         int eliminados = productoRepository.eliminarProductosTemporalesSinPedido();
-        System.out.println("🗑 Productos temporales eliminados: " + eliminados);
+        System.out.println("Productos temporales eliminados: " + eliminados);
 
-        System.out.println("✅ Limpieza programada completada.");
+        System.out.println("Limpieza programada completada.");
     }
 }
