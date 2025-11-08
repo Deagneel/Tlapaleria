@@ -212,7 +212,35 @@ public class PedidoController {
         }
     }
 
+    @PostMapping("/{id}/detalles")
+    @Transactional
+    public ResponseEntity<DetallePedido> agregarDetalle(@PathVariable Long id,
+                                                        @RequestBody PedidoCompletoDTO.DetallePedidoDTO detalleDto) {
+        Optional<Pedido> pedidoOpt = pedidoRepository.findById(id);
+        if (pedidoOpt.isEmpty()) return ResponseEntity.notFound().build();
 
+        Pedido pedido = pedidoOpt.get();
+        Optional<Producto> productoOpt = productoRepository.findById(detalleDto.getProducto_id());
+        if (productoOpt.isEmpty()) return ResponseEntity.badRequest().build();
+
+        DetallePedido detalle = new DetallePedido();
+        detalle.setPedido(pedido);
+        detalle.setProducto(productoOpt.get());
+        detalle.setCantidad(detalleDto.getCantidad());
+        detalle.setPrecio(detalleDto.getPrecio());
+        detalle.setRecibido(detalleDto.getRecibido() != null ? detalleDto.getRecibido() : false);
+
+        detallePedidoRepository.save(detalle);
+
+        // Actualizamos total del pedido
+        BigDecimal total = pedido.getDetalles().stream()
+                .map(DetallePedido::getSubtotal)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        pedido.setTotal(total);
+        pedidoRepository.save(pedido);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(detalle);
+    }
 
 
     // ---------------- DELETE ----------------
