@@ -2,6 +2,7 @@ package com.tlapaleria.backend.model;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 
 @Entity
 @Table(name = "detalle_venta")
@@ -11,26 +12,35 @@ public class DetalleVenta {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne
+    // referencia a la entidad Venta
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "venta_id", nullable = false)
+    @JsonBackReference
     private Venta venta;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "producto_id", nullable = false)
     private Producto producto;
 
+    @Column(nullable = false)
     private Integer cantidad;
 
-    @Column(precision = 19, scale = 2)
+    @Column(precision = 19, scale = 2, nullable = false)
     private BigDecimal precio;
 
+    @Column(precision = 19, scale = 2, nullable = true)
+    private BigDecimal precioIndividual;
+
+    // subtotal calculado en memoria (no persistido) si lo necesitas
+    @Transient
     public BigDecimal getSubtotal() {
-        if (cantidad != null && precio != null) {
+        if (precio != null && cantidad != null) {
             return precio.multiply(BigDecimal.valueOf(cantidad));
         }
         return BigDecimal.ZERO;
     }
 
+    // getters y setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
@@ -45,4 +55,8 @@ public class DetalleVenta {
 
     public BigDecimal getPrecio() { return precio; }
     public void setPrecio(BigDecimal precio) { this.precio = precio; }
+
+    public BigDecimal getPrecioIndividual() {return precioIndividual;}
+
+    public void setPrecioIndividual(BigDecimal precioIndividual) {this.precioIndividual = precioIndividual;}
 }

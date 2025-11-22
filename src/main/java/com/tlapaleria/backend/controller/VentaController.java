@@ -1,163 +1,175 @@
 package com.tlapaleria.backend.controller;
 
-import com.tlapaleria.backend.model.DetalleVenta;
-import com.tlapaleria.backend.model.Venta;
-import com.tlapaleria.backend.repository.VentaRepository;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import com.tlapaleria.backend.model.*;
+import com.tlapaleria.backend.service.VentaService;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
-import java.math.BigDecimal;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeParseException;
-import java.util.*;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/ventas")
 public class VentaController {
 
-    @Autowired
-    private VentaRepository ventaRepository;
+    private final VentaService ventaService;
 
-    @GetMapping
-    public List<Venta> getVentas(
-            @RequestParam(required = false) String fechaInicio,
-            @RequestParam(required = false) String fechaFin) {
-
-        if (fechaInicio != null && fechaFin != null) {
-            LocalDateTime inicio;
-            LocalDateTime fin;
-            try {
-                inicio = LocalDateTime.parse(fechaInicio);
-                fin = LocalDateTime.parse(fechaFin);
-            } catch (DateTimeParseException e) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Formato de fecha inválido. Use yyyy-MM-ddTHH:mm:ss");
-            }
-            return ventaRepository.findByFechaBetween(inicio, fin);
-        }
-        return ventaRepository.findAll();
+    public VentaController(VentaService ventaService) {
+        this.ventaService = ventaService;
     }
 
+    /**
+     * Lista ventas (entidades) - ten cuidado: devolver entidades completas puede
+     * provocar problemas de serialización por lazy proxies. Si ves errores similares
+     * en este endpoint, cambialo para devolver DTOs (resumen) en vez de la entidad.
+     */
+    @GetMapping
+    public ResponseEntity<?> listarVentas() {
+        return ResponseEntity.ok(ventaService.obtenerVentas());
+    }
+
+    // ---------------------------------------------
+    //  NUEVO: /resumen (devuelve DTOs ligeros)
+    // ---------------------------------------------
     @GetMapping("/resumen")
-    public List<Map<String, Object>> resumenVentas(
-            @RequestParam(required = false) String fechaInicio,
-            @RequestParam(required = false) String fechaFin) {
+    public ResponseEntity<List<VentaResumenDTO>> obtenerResumenVentas() {
+        List<VentaResumenDTO> resumen = ventaService.obtenerResumenVentas();
+        return ResponseEntity.ok(resumen);
+    }
 
-        List<Venta> ventas;
-
-        if (fechaInicio != null && fechaFin != null) {
-            LocalDateTime inicio;
-            LocalDateTime fin;
-            try {
-                inicio = LocalDateTime.parse(fechaInicio);
-                fin = LocalDateTime.parse(fechaFin);
-            } catch (DateTimeParseException e) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                        "Formato de fecha inválido. Use yyyy-MM-ddTHH:mm:ss");
-            }
-            ventas = ventaRepository.findByFechaBetween(inicio, fin);
-        } else {
-            ventas = ventaRepository.findAll();
-        }
-
-        return ventas.stream().map(venta -> {
-            Map<String, Object> resumen = new HashMap<>();
-            resumen.put("id", venta.getId());
-            resumen.put("fecha", venta.getFecha());
-            resumen.put("total", venta.getTotal());
-            resumen.put("pago_con", venta.getPago_con());
-            resumen.put("cambio", venta.getCambio());
-
-            resumen.put("detalles", venta.getDetalles() != null ?
-                    venta.getDetalles().stream().map(dv -> Map.of(
-                            "producto", dv.getProducto().getDescripcion(),
-                            "cantidad", dv.getCantidad(),
-                            "precio", dv.getPrecio(),
-                            "subtotal", dv.getSubtotal()
-                    )).toList() : Collections.emptyList());
-
-            return resumen;
-        }).toList();
+    /**
+     * GET /api/ventas/{id}
+     * -- En vez de devolver la entidad 'Venta' (que contiene referencias lazy a Producto),
+     *    devolvemos el DTO seguro construido por el servicio: VentaDetalleDTO.
+     * Esto evita la excepción de Jackson sobre Hibernate proxy (ByteBuddyInterceptor).
+     */
+    @GetMapping("/{id}")
+    public ResponseEntity<?> obtenerVenta(@PathVariable Long id) {
+        VentaDetalleDTO dto = ventaService.obtenerVentaDetalle(id);
+        return ResponseEntity.ok(dto);
     }
 
     @PostMapping
-    public Venta crearVenta(@RequestBody Venta venta) {
-        calcularTotales(venta);
-        return ventaRepository.save(venta);
+    public ResponseEntity<?> crearVenta(@RequestBody VentaDTO dto) {
+        VentaResponseDTO resp = ventaService.crearVenta(dto);
+        return ResponseEntity.ok(resp);
     }
 
-    @GetMapping("/{id}")
-    public Venta getVentaById(@PathVariable Long id) {
-        return ventaRepository.findById(id).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
-    }
+    @GetMapping("/cambio")
+    public ResponseEntity<?> calcularCambio(@RequestParam double total,
+                                            @RequestParam double pagoCon) {
 
-    @PutMapping("/{id}")
-    public Venta actualizarVenta(@PathVariable Long id, @RequestBody Venta detallesVenta) {
-        return ventaRepository.findById(id).map(venta -> {
-            venta.setDetalles(detallesVenta.getDetalles());
-            venta.setPago_con(detallesVenta.getPago_con());
-            calcularTotales(venta);
-            return ventaRepository.save(venta);
-        }).orElseThrow(() ->
-                new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
-    }
-
-    @DeleteMapping("/{id}")
-    public void eliminarVenta(@PathVariable Long id) {
-        if (!ventaRepository.existsById(id)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada");
+        double cambio = Math.round((pagoCon - total) * 100.0) / 100.0;
+        if (cambio <= 0) {
+            return ResponseEntity.ok(Map.of(
+                    "cambio", 0,
+                    "desglose", Map.of()
+            ));
         }
-        ventaRepository.deleteById(id);
+
+        Map<String, Integer> desglose = ventaService.calcularDesgloseCambio(cambio);
+        return ResponseEntity.ok(Map.of(
+                "cambio", cambio,
+                "desglose", desglose
+        ));
     }
 
-    @GetMapping("/{id}/ticket")
-    public Map<String, Object> generarTicket(@PathVariable Long id) {
-        Venta venta = ventaRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
+    // ---------------- Historial endpoints ----------------
 
-        Map<String, Object> ticket = new LinkedHashMap<>();
-        ticket.put("id", venta.getId());
-        ticket.put("fecha", venta.getFecha());
-        ticket.put("total", venta.getTotal());
-        ticket.put("pago_con", venta.getPago_con());
-        ticket.put("cambio", venta.getCambio());
+    /**
+     * Lista semanas con ventas.
+     */
+    @GetMapping("/historial")
+    public ResponseEntity<List<HistorialWeekDTO>> obtenerSemanas() {
+        List<HistorialWeekDTO> semanas = ventaService.obtenerSemanasDisponibles();
+        return ResponseEntity.ok(semanas);
+    }
 
-        List<Map<String, Object>> detalles = new ArrayList<>();
-        if (venta.getDetalles() != null) {
-            for (DetalleVenta detalle : venta.getDetalles()) {
-                Map<String, Object> det = new LinkedHashMap<>();
-                det.put("producto", detalle.getProducto().getDescripcion());
-                det.put("cantidad", detalle.getCantidad());
-                det.put("precio", detalle.getPrecio());
-                det.put("subtotal", detalle.getSubtotal());
-                detalles.add(det);
-            }
-        }
-        ticket.put("detalles", detalles);
-        return ticket;
+    /**
+     * Ventas por día dentro de una semana.
+     */
+    @GetMapping("/historial/{year}/{week}")
+    public ResponseEntity<List<HistorialDayDTO>> obtenerHistorialSemana(
+            @PathVariable int year,
+            @PathVariable int week) {
+
+        List<HistorialDayDTO> dias = ventaService.obtenerHistorialPorSemana(year, week);
+        return ResponseEntity.ok(dias);
+    }
+
+    /**
+     * Detalle completo de una venta (vía ruta de historial).
+     */
+    @GetMapping("/historial/venta/{id}")
+    public ResponseEntity<?> obtenerVentaDetalle(@PathVariable Long id) {
+        VentaDetalleDTO dto = ventaService.obtenerVentaDetalle(id);
+        return ResponseEntity.ok(dto);
+    }
+
+    // GET meses disponibles (agrupados por año/mes)
+    @GetMapping("/historial/meses")
+    public ResponseEntity<List<HistorialMonthDTO>> obtenerMeses() {
+        List<HistorialMonthDTO> meses = ventaService.obtenerMesesDisponibles();
+        return ResponseEntity.ok(meses);
+    }
+
+    // GET semanas dentro de un mes (year, month)
+    @GetMapping("/historial/{year}/mes/{month}/semanas")
+    public ResponseEntity<List<HistorialWeekDTO>> obtenerSemanasPorMes(
+            @PathVariable int year,
+            @PathVariable int month) {
+        List<HistorialWeekDTO> semanas = ventaService.obtenerSemanasPorMes(year, month);
+        return ResponseEntity.ok(semanas);
+    }
+
+    // GET ventas (resumen) de un día concreto (yyyy-MM-dd)
+    @GetMapping("/historial/dia/{date}")
+    public ResponseEntity<List<VentaResumenHistorialDTO>> obtenerVentasPorDia(
+            @PathVariable String date) {
+        List<VentaResumenHistorialDTO> ventas = ventaService.obtenerVentasPorDia(LocalDate.parse(date));
+        return ResponseEntity.ok(ventas);
+    }
+
+    // GET productos agregados vendidos en un día (yyyy-MM-dd)
+    @GetMapping("/historial/dia/{date}/productos")
+    public ResponseEntity<List<ProductoVendidoDTO>> obtenerProductosVendidosEnDia(
+            @PathVariable String date) {
+        List<ProductoVendidoDTO> productos = ventaService.obtenerProductosVendidosPorDia(LocalDate.parse(date));
+        return ResponseEntity.ok(productos);
     }
 
 
-    private void calcularTotales(Venta venta) {
-        if (venta.getDetalles() != null && !venta.getDetalles().isEmpty()) {
-            BigDecimal total = venta.getDetalles().stream()
-                    .map(d -> d.getPrecio().multiply(BigDecimal.valueOf(d.getCantidad())))
-                    .reduce(BigDecimal.ZERO, BigDecimal::add);
-            venta.setTotal(total);
 
-            if (venta.getPago_con() != null) {
-                if (venta.getPago_con().compareTo(total) < 0) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                            "El pago debe ser igual o mayor al total de la venta");
-                }
-                venta.setCambio(venta.getPago_con().subtract(total));
-            }
-        } else {
-            venta.setTotal(BigDecimal.ZERO);
-            venta.setCambio(BigDecimal.ZERO);
-        }
+
+
+
+    @GetMapping("/historial/anios")
+    public ResponseEntity<List<HistorialYearDTO>> obtenerAnios() {
+        List<HistorialYearDTO> años = ventaService.obtenerAniosDisponibles();
+        return ResponseEntity.ok(años);
+    }
+
+
+    @DeleteMapping("/venta/{id}")
+    public ResponseEntity<?> eliminarVenta(@PathVariable Long id) {
+        ventaService.eliminarVenta(id);
+        return ResponseEntity.noContent().build();
+    }
+
+
+    @DeleteMapping("/detalle/{detalleId}")
+    public ResponseEntity<VentaDetalleDTO> eliminarDetalle(@PathVariable Long detalleId) {
+        VentaDetalleDTO dto = ventaService.eliminarDetalleVenta(detalleId);
+        return ResponseEntity.ok(dto);
+    }
+
+
+
+    @DeleteMapping("/historial/dia/{date}/producto/{productoId}")
+    public ResponseEntity<?> eliminarProductoEnDia(@PathVariable String date, @PathVariable Long productoId) {
+        LocalDate d = LocalDate.parse(date);
+        ventaService.eliminarProductoVendidosEnDia(d, productoId);
+        return ResponseEntity.noContent().build();
     }
 }
