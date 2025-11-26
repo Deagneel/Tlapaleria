@@ -4,6 +4,7 @@ import com.tlapaleria.backend.model.*;
 import com.tlapaleria.backend.repository.DetalleVentaRepository;
 import com.tlapaleria.backend.repository.ProductoRepository;
 import com.tlapaleria.backend.repository.VentaRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
@@ -415,7 +416,6 @@ public class VentaService {
         return dto;
     }
 
-    // ---------------- Helper: cálculo de desglose cambio (ya lo tenías) ----------------
     public Map<String, Integer> calcularDesgloseCambio(double cambioDouble) {
         double[] denoms = {500, 200, 100, 50, 20, 10, 5, 2, 1, 0.5};
         Map<String, Integer> desglose = new LinkedHashMap<>();
@@ -565,5 +565,44 @@ public class VentaService {
 
         return new ArrayList<>(mapa.values());
     }
+
+
+
+    public List<Map<String, Object>> listarVentasDTO() {
+        List<Venta> ventas = ventaRepository.findAll();
+
+        return ventas.stream().map(v -> {
+            Map<String, Object> ventaDTO = new HashMap<>();
+            ventaDTO.put("id", v.getId());
+            ventaDTO.put("total", v.getTotal());
+            ventaDTO.put("fecha", v.getFecha());
+
+            List<Map<String, Object>> detallesDTO = v.getDetalles().stream().map(det -> {
+                Map<String, Object> d = new HashMap<>();
+
+                d.put("id", det.getId());
+                d.put("cantidad", det.getCantidad());
+                d.put("precio", det.getPrecio());
+                d.put("subtotal", det.getSubtotal());
+
+                if (det.getProducto() != null) {
+                    d.put("productoId", det.getProducto().getId());
+                    d.put("descripcion", det.getProducto().getDescripcion());
+                    d.put("clave", det.getProducto().getClave());
+                } else {
+                    d.put("productoId", null);
+                    d.put("descripcion", null);
+                    d.put("clave", null);
+                }
+
+                return d;
+            }).toList();
+
+            ventaDTO.put("detalles", detallesDTO);
+
+            return ventaDTO;
+        }).toList();
+    }
+
 
 }

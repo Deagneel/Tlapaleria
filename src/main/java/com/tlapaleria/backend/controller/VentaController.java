@@ -172,4 +172,13 @@ public class VentaController {
         ventaService.eliminarProductoVendidosEnDia(d, productoId);
         return ResponseEntity.noContent().build();
     }
+
+
+
+
+    @GetMapping("/dto")
+    public ResponseEntity<?> listarVentasDTO() {
+        return ResponseEntity.ok(ventaService.listarVentasDTO());
+    }
+
 }
