@@ -29,6 +29,15 @@ public class Producto {
     @Column(precision = 19, scale = 2)
     private BigDecimal precioIndividual;
 
+    @Column(name = "es_producto_paquete")
+    private Boolean esProductoPaquete = false;
+
+    @Column(name = "piezas_por_paquete")
+    private Integer piezasPorPaquete = 1;
+
+    @Column(name = "piezas_individuales")
+    private Integer piezasIndividuales = 0;
+
     private Integer existencia;
     private Integer existencia_min;
     private String unidad;
@@ -66,4 +75,13 @@ public class Producto {
 
     public Boolean getActivo() { return activo != null ? activo : true; }
     public void setActivo(Boolean activo) { this.activo = activo; }
+
+    public Boolean getEsProductoPaquete() { return esProductoPaquete; }
+    public void setEsProductoPaquete(Boolean esProductoPaquete) { this.esProductoPaquete = esProductoPaquete; }
+
+    public Integer getPiezasPorPaquete() { return piezasPorPaquete; }
+    public void setPiezasPorPaquete(Integer piezasPorPaquete) { this.piezasPorPaquete = piezasPorPaquete; }
+
+    public Integer getPiezasIndividuales() { return piezasIndividuales; }
+    public void setPiezasIndividuales(Integer piezasIndividuales) { this.piezasIndividuales = piezasIndividuales; }
 }

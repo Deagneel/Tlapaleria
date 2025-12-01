@@ -68,19 +68,27 @@ public class VentaService {
         Venta venta = ventaRepository.findById(ventaId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Venta no encontrada"));
 
-
-// restaurar inventario por cada detalle
         for (DetalleVenta det : venta.getDetalles()) {
             Producto prod = productoRepository.findById(det.getProducto().getId()).orElse(null);
             if (prod == null) continue;
-            int actual = prod.getExistencia() != null ? prod.getExistencia() : 0;
-            int suma = det.getCantidad() != null ? det.getCantidad() : 0;
-            prod.setExistencia(actual + suma);
+
+            int cantidad = det.getCantidad() != null ? det.getCantidad() : 0;
+
+            if (Boolean.TRUE.equals(prod.getEsProductoPaquete())) {
+                int nuevasPiezas = prod.getPiezasIndividuales() + cantidad;
+                if (nuevasPiezas > prod.getPiezasPorPaquete()) {
+                    prod.setExistencia(prod.getExistencia() + 1);
+                    prod.setPiezasIndividuales(nuevasPiezas - prod.getPiezasPorPaquete());
+                } else {
+                    prod.setPiezasIndividuales(nuevasPiezas);
+                }
+            } else {
+                int actual = prod.getExistencia() != null ? prod.getExistencia() : 0;
+                prod.setExistencia(actual + cantidad);
+            }
             productoRepository.save(prod);
         }
 
-
-// eliminar la venta (cascade eliminará detalles)
         ventaRepository.delete(venta);
     }
 
@@ -94,23 +102,28 @@ public class VentaService {
         Venta venta = det.getVenta();
         Producto prod = det.getProducto();
 
-        // ✔️ Restaurar inventario
-        int actual = prod.getExistencia() != null ? prod.getExistencia() : 0;
-        int suma = det.getCantidad() != null ? det.getCantidad() : 0;
-        prod.setExistencia(actual + suma);
+        int cantidad = det.getCantidad() != null ? det.getCantidad() : 0;
+
+        if (Boolean.TRUE.equals(prod.getEsProductoPaquete())) {
+            int nuevasPiezas = prod.getPiezasIndividuales() + cantidad;
+            if (nuevasPiezas > prod.getPiezasPorPaquete()) {
+                prod.setExistencia(prod.getExistencia() + 1);
+                prod.setPiezasIndividuales(nuevasPiezas - prod.getPiezasPorPaquete());
+            } else {
+                prod.setPiezasIndividuales(nuevasPiezas);
+            }
+        } else {
+            int actual = prod.getExistencia() != null ? prod.getExistencia() : 0;
+            prod.setExistencia(actual + cantidad);
+        }
         productoRepository.save(prod);
-
-        // ✔️ Eliminar detalle
         detalleVentaRepository.delete(det);
-
-        // ✔️ Recalcular total de la venta
         BigDecimal nuevoTotal = detalleVentaRepository.sumSubtotalesByVentaId(venta.getId());
         if (nuevoTotal == null) nuevoTotal = BigDecimal.ZERO;
 
         venta.setTotal(nuevoTotal);
         ventaRepository.save(venta);
 
-        // ✔️ Regresamos el DTO actualizado
         return obtenerVentaDetalle(venta.getId());
     }
 
@@ -122,28 +135,34 @@ public class VentaService {
         LocalDateTime inicio = date.atStartOfDay();
         LocalDateTime fin = date.atTime(23,59,59, 999_999_999);
 
-
         List<Venta> ventas = ventaRepository.findByFechaBetween(inicio, fin);
-
 
         for (Venta v : ventas) {
             List<DetalleVenta> toRemove = v.getDetalles().stream()
                     .filter(d -> d.getProducto() != null && Objects.equals(d.getProducto().getId(), productoId))
                     .collect(Collectors.toList());
 
-
             for (DetalleVenta det : toRemove) {
-// restaurar inventario
                 Producto prod = productoRepository.findById(productoId).orElse(null);
                 if (prod != null) {
-                    int actual = prod.getExistencia() != null ? prod.getExistencia() : 0;
-                    int suma = det.getCantidad() != null ? det.getCantidad() : 0;
-                    prod.setExistencia(actual + suma);
+                    int cantidad = det.getCantidad() != null ? det.getCantidad() : 0;
+
+                    if (Boolean.TRUE.equals(prod.getEsProductoPaquete())) {
+                        int nuevasPiezas = prod.getPiezasIndividuales() + cantidad;
+                        if (nuevasPiezas > prod.getPiezasPorPaquete()) {
+                            prod.setExistencia(prod.getExistencia() + 1);
+                            prod.setPiezasIndividuales(nuevasPiezas - prod.getPiezasPorPaquete());
+                        } else {
+                            prod.setPiezasIndividuales(nuevasPiezas);
+                        }
+                    } else {
+                        // Producto normal
+                        int actual = prod.getExistencia() != null ? prod.getExistencia() : 0;
+                        prod.setExistencia(actual + cantidad);
+                    }
                     productoRepository.save(prod);
                 }
 
-
-// eliminar detalle
                 detalleVentaRepository.deleteById(det.getId());
             }
         }
@@ -153,118 +172,265 @@ public class VentaService {
 
     @Transactional
     public VentaResponseDTO crearVenta(VentaDTO dto) {
-        if (dto == null) throw new IllegalArgumentException("VentaDTO es nulo");
+        try {
+            if (dto == null) {
+                throw new IllegalArgumentException("VentaDTO es nulo");
+            }
 
-        // Construir entidad Venta
-        Venta venta = new Venta();
+            if (dto.getDetalles() != null) {
+                for (int i = 0; i < dto.getDetalles().size(); i++) {
+                    DetalleVentaDTO detalle = dto.getDetalles().get(i);
+                }
+            }
 
-        List<DetalleVenta> detalles = new ArrayList<>();
-        if (dto.getDetalles() != null) {
-            for (DetalleVentaDTO d : dto.getDetalles()) {
-                if (d.getProductoId() == null) continue;
+            Venta venta = new Venta();
 
-                Producto prod = productoRepository.findById(d.getProductoId())
-                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
-                                "Producto no encontrado: " + d.getProductoId()));
+            List<DetalleVenta> detalles = new ArrayList<>();
+            if (dto.getDetalles() != null) {
+                for (DetalleVentaDTO d : dto.getDetalles()) {
+                    if (d.getProductoId() == null) {
+                        System.out.println("Detalle con productoId null, saltando...");
+                        continue;
+                    }
 
-                DetalleVenta det = new DetalleVenta();
-                det.setVenta(venta);
-                det.setProducto(prod);
-                det.setCantidad(d.getCantidad() != null ? d.getCantidad() : 0);
+                    Producto prod = productoRepository.findById(d.getProductoId())
+                            .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                                    "Producto no encontrado: " + d.getProductoId()));
 
-                // 🔹 Usar precio enviado por frontend, o fallback al precio individual o normal del producto
-                BigDecimal precioFinal = d.getPrecio() != null
-                        ? d.getPrecio()
-                        : (d.getPrecioIndividual() != null
-                        ? d.getPrecioIndividual()
-                        : prod.getPrecio());
+                    DetalleVenta det = new DetalleVenta();
+                    det.setVenta(venta);
+                    det.setProducto(prod);
 
-                det.setPrecio(precioFinal);
-                det.setPrecioIndividual(d.getPrecioIndividual() != null ? d.getPrecioIndividual() : prod.getPrecio());
+                    // ASIGNAR CANTIDAD EXACTA
+                    Integer cantidad = d.getCantidad();
+                    if (cantidad == null || cantidad <= 0) {
+                        System.out.println(" Cantidad inválida para producto " + prod.getId() + ", usando 1");
+                        cantidad = 1;
+                    }
+                    det.setCantidad(cantidad);
 
-                detalles.add(det);
+                    BigDecimal precioFinal;
+
+                    if (d.getPrecio() != null && d.getPrecio().compareTo(BigDecimal.ZERO) > 0) {
+                        precioFinal = d.getPrecio();
+                    }
+                    else {
+
+                        Boolean esProductoEmpaquetado = prod.getEsProductoPaquete();
+
+                        if (Boolean.TRUE.equals(esProductoEmpaquetado)) {
+
+                            boolean probableVentaPorPiezas = cantidad < prod.getPiezasPorPaquete();
+
+                            if (probableVentaPorPiezas && prod.getPrecioIndividual() != null &&
+                                    prod.getPrecioIndividual().compareTo(BigDecimal.ZERO) > 0) {
+                                // VENTA POR PIEZAS INDIVIDUALES
+                                precioFinal = prod.getPrecioIndividual();
+
+                            } else if (prod.getPrecio() != null && prod.getPrecio().compareTo(BigDecimal.ZERO) > 0) {
+                                // VENTA POR PAQUETE COMPLETO
+                                precioFinal = prod.getPrecio();
+
+                            } else if (prod.getPrecioIndividual() != null && prod.getPrecioIndividual().compareTo(BigDecimal.ZERO) > 0) {
+                                precioFinal = prod.getPrecioIndividual();
+
+                            } else {
+                                precioFinal = new BigDecimal("0.70");
+
+                            }
+                        } else {
+                            // PRODUCTO NORMAL
+                            if (prod.getPrecio() != null && prod.getPrecio().compareTo(BigDecimal.ZERO) > 0) {
+                                precioFinal = prod.getPrecio();
+
+                            } else if (prod.getPrecioIndividual() != null && prod.getPrecioIndividual().compareTo(BigDecimal.ZERO) > 0) {
+                                precioFinal = prod.getPrecioIndividual();
+
+                            } else {
+                                precioFinal = BigDecimal.ONE;
+
+                            }
+                        }
+                    }
+
+                    if (precioFinal == null || precioFinal.compareTo(BigDecimal.ZERO) <= 0) {
+                        precioFinal = new BigDecimal("0.70");
+                    }
+
+                    det.setPrecio(precioFinal);
+                    det.setPrecioIndividual(null);
+
+                    detalles.add(det);
+                }
+            }
+
+            if (detalles.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No se pudieron crear detalles válidos");
+            }
+
+            venta.setDetalles(detalles);
+
+            // CALCULAR TOTAL EXACTO
+            BigDecimal subtotal = BigDecimal.ZERO;
+            for (DetalleVenta det : detalles) {
+                BigDecimal precio = det.getPrecio() != null ? det.getPrecio() : BigDecimal.ZERO;
+                Integer cantidad = det.getCantidad() != null ? det.getCantidad() : 0;
+                BigDecimal subtotalLinea = precio.multiply(new BigDecimal(cantidad.toString()));
+
+                subtotal = subtotal.add(subtotalLinea);
+            }
+
+            BigDecimal cargoExtra = dto.getCargoExtra() != null ? dto.getCargoExtra() : BigDecimal.ZERO;
+            BigDecimal total = subtotal.add(cargoExtra);
+
+
+            venta.setCargo_extra(cargoExtra);
+            venta.setTotal(total);
+            venta.setPago_con(dto.getPagoCon() != null ? dto.getPagoCon() : BigDecimal.ZERO);
+            venta.setCambio(venta.getPago_con().compareTo(total) >= 0
+                    ? venta.getPago_con().subtract(total)
+                    : BigDecimal.ZERO);
+            venta.setFecha(LocalDateTime.now());
+
+            Venta saved = ventaRepository.save(venta);
+
+
+            List<ProductoLowStockDTO> lowStock = new ArrayList<>();
+            for (DetalleVenta det : saved.getDetalles()) {
+                Producto producto = productoRepository.findById(det.getProducto().getId()).orElse(null);
+                if (producto == null) continue;
+
+                int cantidadVendida = det.getCantidad() != null ? det.getCantidad() : 0;
+
+                if (Boolean.TRUE.equals(producto.getEsProductoPaquete())) {
+                    boolean esVentaPorPaquete = esVentaPorPaquete(det, producto);
+
+                    if (esVentaPorPaquete) {
+                        int existenciaActual = producto.getExistencia() != null ? producto.getExistencia() : 0;
+                        producto.setExistencia(existenciaActual - cantidadVendida);
+                    } else {
+                        int nuevasPiezasIndividuales = producto.getPiezasIndividuales() - cantidadVendida;
+
+                        if (nuevasPiezasIndividuales < 0) {
+                            // Se necesita abrir un nuevo paquete
+                            int paquetesARestar = Math.abs(nuevasPiezasIndividuales) / producto.getPiezasPorPaquete() + 1;
+                            int piezasRestantes = (paquetesARestar * producto.getPiezasPorPaquete()) + nuevasPiezasIndividuales;
+
+                            producto.setExistencia(producto.getExistencia() - paquetesARestar);
+                            producto.setPiezasIndividuales(piezasRestantes);
+                        } else {
+                            // Solo restar piezas individuales
+                            producto.setPiezasIndividuales(nuevasPiezasIndividuales);
+                        }
+                    }
+                } else {
+                    // PRODUCTO NORMAL
+                    int actual = producto.getExistencia() != null ? producto.getExistencia() : 0;
+                    int nueva = actual - cantidadVendida;
+                    producto.setExistencia(nueva);
+                }
+
+                productoRepository.save(producto);
+
+                // Verificar stock bajo
+                int min = producto.getExistencia_min() != null ? producto.getExistencia_min() : 0;
+                int existenciaActual = calcularExistenciaReal(producto);
+
+                if (existenciaActual <= min) {
+                    lowStock.add(new ProductoLowStockDTO(
+                            producto.getId(),
+                            producto.getClave(),
+                            producto.getDescripcion(),
+                            existenciaActual,
+                            min,
+                            producto.getEsProductoPaquete(),
+                            producto.getPiezasPorPaquete(),
+                            producto.getPiezasIndividuales()
+                    ));
+                }
+            }
+
+            VentaDetalleDTO ventaDetalleDTO = new VentaDetalleDTO();
+            ventaDetalleDTO.setId(saved.getId());
+            ventaDetalleDTO.setTotal(saved.getTotal());
+            ventaDetalleDTO.setPagoCon(saved.getPago_con());
+            ventaDetalleDTO.setCambio(saved.getCambio());
+            ventaDetalleDTO.setCargoExtra(saved.getCargo_extra());
+            ventaDetalleDTO.setFecha(saved.getFecha());
+
+            List<DetalleVentaResultDTO> detallesResp = saved.getDetalles().stream().map(det -> {
+                DetalleVentaResultDTO dr = new DetalleVentaResultDTO();
+                dr.setId(det.getId());
+                dr.setProductoId(det.getProducto().getId());
+                dr.setClave(det.getProducto().getClave());
+                dr.setDescripcion(det.getProducto().getDescripcion());
+                dr.setCantidad(det.getCantidad());
+                dr.setPrecio(det.getPrecio());
+                dr.setSubtotal(det.getSubtotal());
+                dr.setExistencia(det.getProducto().getExistencia());
+                dr.setExistenciaMin(det.getProducto().getExistencia_min());
+                dr.setEsProductoPaquete(det.getProducto().getEsProductoPaquete());
+                dr.setPiezasPorPaquete(det.getProducto().getPiezasPorPaquete());
+                dr.setPiezasIndividuales(det.getProducto().getPiezasIndividuales());
+
+                return dr;
+            }).collect(Collectors.toList());
+
+            ventaDetalleDTO.setDetalles(detallesResp);
+
+            VentaResponseDTO response = new VentaResponseDTO();
+            response.setVenta(ventaDetalleDTO);
+            response.setLowStock(lowStock);
+
+            return response;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Error al crear venta: " + e.getMessage());
+        }
+    }
+
+    private boolean esVentaPorPaquete(DetalleVenta detalle, Producto producto) {
+        // Estrategia 1: Si el precio del detalle es igual al precio del paquete
+        if (detalle.getPrecio() != null && producto.getPrecio() != null &&
+                detalle.getPrecio().compareTo(producto.getPrecio()) == 0) {
+            return true;
+        }
+
+        // Estrategia 2: Si la cantidad es múltiplo exacto de piezas por paquete
+        if (detalle.getCantidad() != null && producto.getPiezasPorPaquete() != null &&
+                producto.getPiezasPorPaquete() > 0) {
+            boolean esMultiplo = detalle.getCantidad() % producto.getPiezasPorPaquete() == 0;
+            if (esMultiplo) {
+                return true;
             }
         }
-        venta.setDetalles(detalles);
 
-        // Calcular total
-        BigDecimal subtotal = detalles.stream()
-                .map(DetalleVenta::getSubtotal) // subtotal = precio * cantidad
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Estrategia 4: Si el precio del detalle es igual al precio individual, es venta por PIEZAS
+        if (detalle.getPrecio() != null && producto.getPrecioIndividual() != null &&
+                detalle.getPrecio().compareTo(producto.getPrecioIndividual()) == 0) {
+            return false;
+        }
 
-        BigDecimal cargoExtra = dto.getCargoExtra() != null ? dto.getCargoExtra() : BigDecimal.ZERO;
-        BigDecimal total = subtotal.add(cargoExtra);
-
-        venta.setCargo_extra(cargoExtra);
-        venta.setTotal(total);
-
-        venta.setPago_con(dto.getPagoCon() != null ? dto.getPagoCon() : BigDecimal.ZERO);
-        venta.setCambio(venta.getPago_con().compareTo(total) >= 0
-                ? venta.getPago_con().subtract(total)
-                : BigDecimal.ZERO);
-
-        venta.setFecha(LocalDateTime.now());
-
-        // Guardar venta y detalles (cascade)
-        Venta saved = ventaRepository.save(venta);
-
-        // Actualizar inventario y obtener lowStock
-        List<ProductoLowStockDTO> lowStock = new ArrayList<>();
-        for (DetalleVenta det : saved.getDetalles()) {
-            Producto producto = productoRepository.findById(det.getProducto().getId()).orElse(null);
-            if (producto == null) continue;
-
-            int actual = producto.getExistencia() != null ? producto.getExistencia() : 0;
-            int nueva = actual - (det.getCantidad() != null ? det.getCantidad() : 0);
-            producto.setExistencia(nueva);
-            productoRepository.save(producto);
-
-            int min = producto.getExistencia_min() != null ? producto.getExistencia_min() : 0;
-            if (nueva <= min) {
-                lowStock.add(new ProductoLowStockDTO(
-                        producto.getId(),
-                        producto.getClave(),
-                        producto.getDescripcion(),
-                        nueva,
-                        min
-                ));
+        // Estrategia 5: Si la cantidad es menor que piezas por paquete, probablemente es venta por PIEZAS
+        if (detalle.getCantidad() != null && producto.getPiezasPorPaquete() != null &&
+                producto.getPiezasPorPaquete() > 0) {
+            if (detalle.getCantidad() < producto.getPiezasPorPaquete()) {
+                return false;
             }
         }
 
-        // Mapear entidad Venta -> VentaDetalleDTO (respuesta)
-        VentaDetalleDTO ventaDetalleDTO = new VentaDetalleDTO();
-        ventaDetalleDTO.setId(saved.getId());
-        ventaDetalleDTO.setTotal(saved.getTotal());
-        ventaDetalleDTO.setPagoCon(saved.getPago_con());
-        ventaDetalleDTO.setCambio(saved.getCambio());
-        ventaDetalleDTO.setCargoExtra(saved.getCargo_extra());
-        ventaDetalleDTO.setFecha(saved.getFecha());
+        return false;
+    }
 
-        List<DetalleVentaResultDTO> detallesResp = saved.getDetalles().stream().map(det -> {
-            DetalleVentaResultDTO dr = new DetalleVentaResultDTO();
-            dr.setId(det.getId());
-            dr.setProductoId(det.getProducto().getId());
-            dr.setClave(det.getProducto().getClave());
-            dr.setDescripcion(det.getProducto().getDescripcion());
-            dr.setCantidad(det.getCantidad());
-            dr.setPrecio(det.getPrecio());           // ahora refleja precio correcto
-            dr.setSubtotal(det.getSubtotal());
-
-            // 🔹 Precio individual también enviado
-            dr.setPrecioIndividual(det.getPrecioIndividual());
-
-            dr.setExistencia(det.getProducto().getExistencia());
-            dr.setExistenciaMin(det.getProducto().getExistencia_min());
-            return dr;
-        }).collect(Collectors.toList());
-
-        ventaDetalleDTO.setDetalles(detallesResp);
-
-        VentaResponseDTO response = new VentaResponseDTO();
-        response.setVenta(ventaDetalleDTO);
-        response.setLowStock(lowStock);
-
-        return response;
+    private int calcularExistenciaReal(Producto producto) {
+        if (Boolean.TRUE.equals(producto.getEsProductoPaquete())) {
+            int paquetes = producto.getExistencia() != null ? producto.getExistencia() : 0;
+            int piezasIndividuales = producto.getPiezasIndividuales() != null ? producto.getPiezasIndividuales() : 0;
+            return (paquetes * producto.getPiezasPorPaquete()) + piezasIndividuales;
+        } else {
+            return producto.getExistencia() != null ? producto.getExistencia() : 0;
+        }
     }
 
 
@@ -290,13 +456,11 @@ public class VentaService {
         return ventaRepository.findById(id);
     }
 
-    // ---------------- Historial: semanas disponibles ----------------
     public List<HistorialWeekDTO> obtenerSemanasDisponibles() {
         List<Venta> ventas = ventaRepository.findAll();
         if (ventas.isEmpty()) return Collections.emptyList();
 
         WeekFields wf = WeekFields.ISO;
-        // agrupar por (year, week)
         Map<String, List<Venta>> porSemana = ventas.stream().collect(Collectors.groupingBy(v -> {
             LocalDate date = v.getFecha().toLocalDate();
             int week = date.get(wf.weekOfWeekBasedYear());
@@ -311,10 +475,8 @@ public class VentaService {
             int week = Integer.parseInt(parts[1]);
             List<Venta> vlist = e.getValue();
 
-            // calcular inicio y fin de semana ISO
             LocalDate anyDate = vlist.get(0).getFecha().toLocalDate();
             LocalDate start = anyDate.with(wf.dayOfWeek(), 1);
-            // ajustar al week/year
             start = LocalDate.now()
                     .withYear(year)
                     .with(wf.weekOfWeekBasedYear(), week)
@@ -330,7 +492,6 @@ public class VentaService {
             semanas.add(new HistorialWeekDTO(year, week, start, end, vlist.size(), totalSemana));
         }
 
-        // ordenar por (year desc, week desc)
         semanas.sort(Comparator.comparing(HistorialWeekDTO::getYear).reversed()
                 .thenComparing(HistorialWeekDTO::getWeek).reversed());
 
@@ -342,7 +503,6 @@ public class VentaService {
         List<Venta> ventas = ventaRepository.findAll(); // dataset pequeño, usar findAll y filtrar
 
         WeekFields wf = WeekFields.ISO;
-        // filtrar ventas de esa week/year
         List<Venta> ventasSemana = ventas.stream().filter(v -> {
             LocalDate date = v.getFecha().toLocalDate();
             int w = date.get(wf.weekOfWeekBasedYear());
@@ -352,11 +512,9 @@ public class VentaService {
 
         if (ventasSemana.isEmpty()) return Collections.emptyList();
 
-        // Agrupar por día (LocalDate)
         Map<LocalDate, List<Venta>> porDia = ventasSemana.stream()
                 .collect(Collectors.groupingBy(v -> v.getFecha().toLocalDate()));
 
-        // Para cada día construimos HistorialDayDTO
         List<HistorialDayDTO> dias = porDia.entrySet().stream().map(entry -> {
             LocalDate dia = entry.getKey();
             List<Venta> lista = entry.getValue();
@@ -408,6 +566,10 @@ public class VentaService {
             dr.setExistencia(det.getProducto().getExistencia());
             dr.setExistenciaMin(det.getProducto().getExistencia_min());
 
+            dr.setEsProductoPaquete(det.getProducto().getEsProductoPaquete());
+            dr.setPiezasPorPaquete(det.getProducto().getPiezasPorPaquete());
+            dr.setPiezasIndividuales(det.getProducto().getPiezasIndividuales());
+
             return dr;
         }).collect(Collectors.toList());
 
@@ -431,8 +593,6 @@ public class VentaService {
         return desglose;
     }
 
-
-    /** Meses disponibles (agrupa por YearMonth) */
     public List<HistorialMonthDTO> obtenerMesesDisponibles() {
         List<Venta> ventas = ventaRepository.findAll();
         if (ventas.isEmpty()) return Collections.emptyList();
@@ -459,7 +619,6 @@ public class VentaService {
         return meses;
     }
 
-    /** Semanas dentro de un mes (filtra por año/mes y reutiliza la lógica de settimana) */
     public List<HistorialWeekDTO> obtenerSemanasPorMes(int year, int month) {
         List<Venta> ventas = ventaRepository.findAll();
         WeekFields wf = WeekFields.ISO;
@@ -505,7 +664,6 @@ public class VentaService {
         return semanas;
     }
 
-    /** Ventas (resumen) de un día particular */
     public List<VentaResumenHistorialDTO> obtenerVentasPorDia(LocalDate date) {
         List<Venta> ventas = ventaRepository.findAll();
         List<Venta> porDia = ventas.stream()
@@ -522,10 +680,6 @@ public class VentaService {
         }).sorted(Comparator.comparing(VentaResumenHistorialDTO::getFecha)).collect(Collectors.toList());
     }
 
-    /**
-     * Productos vendidos en un día (agregados).
-     * Necesita @Transactional para garantizar carga de productos lazy dentro de la sesión.
-     */
     @Transactional(readOnly = true)
     public List<ProductoVendidoDTO> obtenerProductosVendidosPorDia(LocalDate date) {
         List<Venta> ventas = ventaRepository.findAll().stream()
@@ -552,7 +706,9 @@ public class VentaService {
                             subtotal,
                             1,
                             det.getProducto().getExistencia(),
-                            det.getProducto().getExistencia_min()
+                            det.getProducto().getExistencia_min(),
+                            det.getProducto().getEsProductoPaquete(),
+                            det.getProducto().getPiezasPorPaquete()
                     );
                     mapa.put(pid, p);
                 } else {

@@ -32,6 +32,17 @@ public class ProductoController {
 
     @PostMapping
     public Producto crearProducto(@RequestBody Producto producto) {
+        if (producto.getEsProductoPaquete() == null) {
+            producto.setEsProductoPaquete(false);
+        }
+        if (producto.getPiezasPorPaquete() == null) {
+            producto.setPiezasPorPaquete(1);
+        }
+
+        if (producto.getPiezasIndividuales() == null) {
+            producto.setPiezasIndividuales(0);
+        }
+
         validarProducto(producto);
         return productoRepository.save(producto);
     }
@@ -55,6 +66,9 @@ public class ProductoController {
             producto.setExistencia_min(detallesProducto.getExistencia_min());
             producto.setUnidad(detallesProducto.getUnidad());
             producto.setActivo(detallesProducto.getActivo());
+            producto.setEsProductoPaquete(detallesProducto.getEsProductoPaquete());
+            producto.setPiezasPorPaquete(detallesProducto.getPiezasPorPaquete());
+            producto.setPiezasIndividuales(detallesProducto.getPiezasIndividuales());
 
             validarProducto(producto);
             return productoRepository.save(producto);
@@ -93,10 +107,15 @@ public class ProductoController {
         if (producto.getPrecioIndividual() == null || producto.getPrecioIndividual().compareTo(BigDecimal.ZERO) < 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "El precio individual no puede ser negativo");
 
-        if (producto.getExistencia() == null || producto.getExistencia() < 0)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La existencia no puede ser negativa");
+        if (producto.getExistencia() == null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La existencia es obligatoria");
 
         if (producto.getExistencia_min() == null || producto.getExistencia_min() < 0)
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "La existencia mínima no puede ser negativa");
+
+        if (producto.getPiezasPorPaquete() != null && producto.getPiezasPorPaquete() < 1) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Las piezas por paquete deben ser al menos 1");
+        }
+
     }
 }

@@ -17,6 +17,10 @@ public class DetalleVentaResultDTO {
     private BigDecimal precio;
     private BigDecimal subtotal;
 
+    private Boolean esProductoPaquete;
+    private Integer piezasPorPaquete;
+    private Integer piezasIndividuales;
+
     private Integer existencia;
 
     @JsonProperty("existencia_min")
@@ -58,4 +62,11 @@ public class DetalleVentaResultDTO {
     public void setPrecioIndividual(BigDecimal precioIndividual) {
         this.precioIndividual = precioIndividual;
     }
+
+    public Boolean getEsProductoPaquete() { return esProductoPaquete; }
+    public void setEsProductoPaquete(Boolean esProductoPaquete) { this.esProductoPaquete = esProductoPaquete; }
+    public Integer getPiezasPorPaquete() { return piezasPorPaquete; }
+    public void setPiezasPorPaquete(Integer piezasPorPaquete) { this.piezasPorPaquete = piezasPorPaquete; }
+    public Integer getPiezasIndividuales() { return piezasIndividuales; }
+    public void setPiezasIndividuales(Integer piezasIndividuales) { this.piezasIndividuales = piezasIndividuales; }
 }

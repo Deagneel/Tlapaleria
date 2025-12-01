@@ -12,10 +12,16 @@ public class ProductoVendidoDTO {
     private Integer existencia;
     private Integer existenciaMin;
 
+    private Boolean esProductoPaquete;
+    private Integer piezasPorPaquete;
+
 
     public ProductoVendidoDTO() {}
 
-    public ProductoVendidoDTO(Long productoId, String clave, String descripcion, Integer cantidadTotal, BigDecimal subtotalTotal, Integer veces, Integer existencia, Integer existenciaMin) {
+    public ProductoVendidoDTO(Long productoId, String clave, String descripcion,
+                              Integer cantidadTotal, BigDecimal subtotalTotal,
+                              Integer veces, Integer existencia, Integer existenciaMin,
+                              Boolean esProductoPaquete, Integer piezasPorPaquete) {
         this.productoId = productoId;
         this.clave = clave;
         this.descripcion = descripcion;
@@ -24,6 +30,8 @@ public class ProductoVendidoDTO {
         this.veces = veces;
         this.existencia = existencia;
         this.existenciaMin = existenciaMin;
+        this.esProductoPaquete = esProductoPaquete;
+        this.piezasPorPaquete = piezasPorPaquete;
     }
 
     public Long getProductoId() { return productoId; }
@@ -46,4 +54,9 @@ public class ProductoVendidoDTO {
 
     public Integer getExistencia() { return existencia; }
     public Integer getExistenciaMin() { return existenciaMin; }
+
+    public Boolean getEsProductoPaquete() { return esProductoPaquete; }
+    public void setEsProductoPaquete(Boolean esProductoPaquete) { this.esProductoPaquete = esProductoPaquete; }
+    public Integer getPiezasPorPaquete() { return piezasPorPaquete; }
+    public void setPiezasPorPaquete(Integer piezasPorPaquete) { this.piezasPorPaquete = piezasPorPaquete; }
 }

@@ -15,7 +15,6 @@ public class Venta {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // evitamos serializar la venta completa recursivamente usando JsonManagedReference
     @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonManagedReference
     private List<DetalleVenta> detalles = new ArrayList<>();
@@ -29,14 +28,12 @@ public class Venta {
     @Column(nullable = false, precision = 19, scale = 2)
     private BigDecimal cambio = BigDecimal.ZERO;
 
-    // cargo_extra lo guardamos por si el frontend lo envía
     @Column(precision = 19, scale = 2)
     private BigDecimal cargo_extra = BigDecimal.ZERO;
 
     @Column(nullable = false)
     private LocalDateTime fecha = LocalDateTime.now();
 
-    // getters y setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

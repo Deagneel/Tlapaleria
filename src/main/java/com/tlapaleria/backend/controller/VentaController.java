@@ -19,31 +19,17 @@ public class VentaController {
         this.ventaService = ventaService;
     }
 
-    /**
-     * Lista ventas (entidades) - ten cuidado: devolver entidades completas puede
-     * provocar problemas de serialización por lazy proxies. Si ves errores similares
-     * en este endpoint, cambialo para devolver DTOs (resumen) en vez de la entidad.
-     */
     @GetMapping
     public ResponseEntity<?> listarVentas() {
         return ResponseEntity.ok(ventaService.obtenerVentas());
     }
 
-    // ---------------------------------------------
-    //  NUEVO: /resumen (devuelve DTOs ligeros)
-    // ---------------------------------------------
     @GetMapping("/resumen")
     public ResponseEntity<List<VentaResumenDTO>> obtenerResumenVentas() {
         List<VentaResumenDTO> resumen = ventaService.obtenerResumenVentas();
         return ResponseEntity.ok(resumen);
     }
 
-    /**
-     * GET /api/ventas/{id}
-     * -- En vez de devolver la entidad 'Venta' (que contiene referencias lazy a Producto),
-     *    devolvemos el DTO seguro construido por el servicio: VentaDetalleDTO.
-     * Esto evita la excepción de Jackson sobre Hibernate proxy (ByteBuddyInterceptor).
-     */
     @GetMapping("/{id}")
     public ResponseEntity<?> obtenerVenta(@PathVariable Long id) {
         VentaDetalleDTO dto = ventaService.obtenerVentaDetalle(id);
@@ -75,20 +61,12 @@ public class VentaController {
         ));
     }
 
-    // ---------------- Historial endpoints ----------------
-
-    /**
-     * Lista semanas con ventas.
-     */
     @GetMapping("/historial")
     public ResponseEntity<List<HistorialWeekDTO>> obtenerSemanas() {
         List<HistorialWeekDTO> semanas = ventaService.obtenerSemanasDisponibles();
         return ResponseEntity.ok(semanas);
     }
 
-    /**
-     * Ventas por día dentro de una semana.
-     */
     @GetMapping("/historial/{year}/{week}")
     public ResponseEntity<List<HistorialDayDTO>> obtenerHistorialSemana(
             @PathVariable int year,
@@ -98,23 +76,18 @@ public class VentaController {
         return ResponseEntity.ok(dias);
     }
 
-    /**
-     * Detalle completo de una venta (vía ruta de historial).
-     */
     @GetMapping("/historial/venta/{id}")
     public ResponseEntity<?> obtenerVentaDetalle(@PathVariable Long id) {
         VentaDetalleDTO dto = ventaService.obtenerVentaDetalle(id);
         return ResponseEntity.ok(dto);
     }
 
-    // GET meses disponibles (agrupados por año/mes)
     @GetMapping("/historial/meses")
     public ResponseEntity<List<HistorialMonthDTO>> obtenerMeses() {
         List<HistorialMonthDTO> meses = ventaService.obtenerMesesDisponibles();
         return ResponseEntity.ok(meses);
     }
 
-    // GET semanas dentro de un mes (year, month)
     @GetMapping("/historial/{year}/mes/{month}/semanas")
     public ResponseEntity<List<HistorialWeekDTO>> obtenerSemanasPorMes(
             @PathVariable int year,
@@ -123,7 +96,6 @@ public class VentaController {
         return ResponseEntity.ok(semanas);
     }
 
-    // GET ventas (resumen) de un día concreto (yyyy-MM-dd)
     @GetMapping("/historial/dia/{date}")
     public ResponseEntity<List<VentaResumenHistorialDTO>> obtenerVentasPorDia(
             @PathVariable String date) {
@@ -131,17 +103,12 @@ public class VentaController {
         return ResponseEntity.ok(ventas);
     }
 
-    // GET productos agregados vendidos en un día (yyyy-MM-dd)
     @GetMapping("/historial/dia/{date}/productos")
     public ResponseEntity<List<ProductoVendidoDTO>> obtenerProductosVendidosEnDia(
             @PathVariable String date) {
         List<ProductoVendidoDTO> productos = ventaService.obtenerProductosVendidosPorDia(LocalDate.parse(date));
         return ResponseEntity.ok(productos);
     }
-
-
-
-
 
 
     @GetMapping("/historial/anios")

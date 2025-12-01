@@ -12,7 +12,6 @@ public class DetalleVenta {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    // referencia a la entidad Venta
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "venta_id", nullable = false)
     @JsonBackReference
@@ -31,7 +30,6 @@ public class DetalleVenta {
     @Column(precision = 19, scale = 2, nullable = true)
     private BigDecimal precioIndividual;
 
-    // subtotal calculado en memoria (no persistido) si lo necesitas
     @Transient
     public BigDecimal getSubtotal() {
         if (precio != null && cantidad != null) {
@@ -40,7 +38,6 @@ public class DetalleVenta {
         return BigDecimal.ZERO;
     }
 
-    // getters y setters
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 

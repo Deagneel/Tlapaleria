@@ -180,11 +180,32 @@ public class PedidoController {
 
                         Producto productoDb = productoRepository.findById(productoId).orElse(null);
                         if (productoDb != null) {
-                            Integer existenciaActual = productoDb.getExistencia() != null ? productoDb.getExistencia() : 0;
                             Integer cantidadRecibida = detalle.getCantidad() != null ? detalle.getCantidad() : 0;
 
-                            Integer nuevaExistencia = existenciaActual + cantidadRecibida;
+                            Boolean esProductoPaquete = productoDb.getEsProductoPaquete();
+                            Integer piezasPorPaquete = productoDb.getPiezasPorPaquete();
+                            Integer piezasIndividualesActuales = productoDb.getPiezasIndividuales();
+                            Integer existenciaActual = productoDb.getExistencia() != null ? productoDb.getExistencia() : 0;
+
+                            Integer nuevaExistencia;
+
+                            if (existenciaActual < 0) {
+                                nuevaExistencia = cantidadRecibida;
+                            } else {
+                                nuevaExistencia = existenciaActual + cantidadRecibida;
+                            }
+
                             productoDb.setExistencia(nuevaExistencia);
+
+                            if (Boolean.TRUE.equals(esProductoPaquete)) {
+                                // Reiniciar piezas individuales solo si son negativas
+                                if (piezasIndividualesActuales < 0) {
+                                    productoDb.setPiezasIndividuales(piezasPorPaquete);
+                                }
+                            }
+
+                            productoDb.setEsProductoPaquete(esProductoPaquete);
+                            productoDb.setPiezasPorPaquete(piezasPorPaquete);
 
                             productoRepository.save(productoDb);
                         }
@@ -231,7 +252,6 @@ public class PedidoController {
 
         detallePedidoRepository.save(detalle);
 
-        // Actualizamos total del pedido
         BigDecimal total = pedido.getDetalles().stream()
                 .map(DetallePedido::getSubtotal)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -268,7 +288,6 @@ public class PedidoController {
             dd.setPrecio(d.getPrecio());
             dd.setRecibido(d.isRecibido());
 
-            // Incluimos el producto completo
             dd.setProducto(new ProductoDTO(
                     d.getProducto().getId(),
                     d.getProducto().getClave(),
@@ -277,7 +296,10 @@ public class PedidoController {
                     d.getProducto().getCosto(),
                     d.getProducto().getPrecio(),
                     d.getProducto().getPrecioIndividual(),
-                    d.getProducto().getActivo()
+                    d.getProducto().getActivo(),
+                    d.getProducto().getEsProductoPaquete(),
+                    d.getProducto().getPiezasPorPaquete(),
+                    d.getProducto().getPiezasIndividuales()
             ));
 
             return dd;

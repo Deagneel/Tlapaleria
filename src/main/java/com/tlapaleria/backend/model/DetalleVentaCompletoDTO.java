@@ -21,7 +21,6 @@ public class DetalleVentaCompletoDTO {
         this.fechaRegistro = fechaRegistro;
     }
 
-    // getters
     public Long getId() { return id; }
     public String getClave() { return clave; }
     public String getDescripcion() { return descripcion; }

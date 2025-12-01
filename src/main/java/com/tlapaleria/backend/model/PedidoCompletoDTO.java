@@ -18,10 +18,8 @@ public class PedidoCompletoDTO {
         private BigDecimal precio;
         private Boolean recibido;
 
-        // Nuevo campo
         private ProductoDTO producto;
 
-        // Getters y setters existentes
         public Long getId() { return id; }
         public void setId(Long id) { this.id = id; }
 
@@ -37,7 +35,6 @@ public class PedidoCompletoDTO {
         public Boolean getRecibido() { return recibido; }
         public void setRecibido(Boolean recibido) { this.recibido = recibido; }
 
-        // Getter y setter para el producto completo
         public ProductoDTO getProducto() { return producto; }
         public void setProducto(ProductoDTO producto) { this.producto = producto; }
     }
